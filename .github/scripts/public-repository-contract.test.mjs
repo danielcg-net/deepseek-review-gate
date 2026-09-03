@@ -18,6 +18,8 @@ test('action uses an immutable setup action SHA', async () => {
   const action = await read('action.yaml');
   assert.match(action, /uses: hustcer\/setup-nu@[0-9a-f]{40} # v3\.27/);
   assert.doesNotMatch(action, /chat-token.*print/i);
+  assert.match(action, /finding-fingerprints:/);
+  assert.match(action, /reconcile-only:/);
 });
 
 test('public workflows are least privilege and avoid privileged fork execution', async () => {
