@@ -15,10 +15,12 @@ permissions:
 
 steps:
   - name: DeepSeek review
-    uses: danielcg-net/deepseek-review-gate@<RELEASE_COMMIT_SHA>
+    uses: danielcg-net/deepseek-review-gate@9347235fe47109d65860b076eb84835c062dcbcb
     with:
       chat-token: ${{ secrets.DEEPSEEK_API_KEY }}
 ```
+
+For complete public/private workflow examples, partition reconciliation, migration, and rollback, see [consumer integration](docs/consumer-integration.md).
 
 ![Tests](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fgist.githubusercontent.com%2Fhustcer%2Fb99391ee59016b17d0befe3331387e89%2Fraw%2Ftest-summary.json&query=%24.total&label=Tests)
 ![Passed](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fgist.githubusercontent.com%2Fhustcer%2Fb99391ee59016b17d0befe3331387e89%2Fraw%2Ftest-summary.json&query=%24.passed&label=Passed&color=%2331c654)
@@ -82,7 +84,7 @@ jobs:
     name: Code Review
     steps:
       - name: DeepSeek Code Review
-        uses: danielcg-net/deepseek-review-gate@<RELEASE_COMMIT_SHA>
+        uses: danielcg-net/deepseek-review-gate@9347235fe47109d65860b076eb84835c062dcbcb
         with:
           chat-token: ${{ secrets.CHAT_TOKEN }}
 ```
@@ -130,7 +132,7 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'ai review')
     steps:
       - name: DeepSeek Code Review
-        uses: danielcg-net/deepseek-review-gate@<RELEASE_COMMIT_SHA>
+        uses: danielcg-net/deepseek-review-gate@9347235fe47109d65860b076eb84835c062dcbcb
         with:
           chat-token: ${{ secrets.CHAT_TOKEN }}
 ```
@@ -163,7 +165,7 @@ jobs:
     name: Code Review
     steps:
       - name: DeepSeek Code Review
-        uses: danielcg-net/deepseek-review-gate@<RELEASE_COMMIT_SHA>
+        uses: danielcg-net/deepseek-review-gate@9347235fe47109d65860b076eb84835c062dcbcb
         with:
           model: "deepseek-ai/DeepSeek-R1"
           base-url: "https://api.siliconflow.cn/v1"
@@ -200,7 +202,7 @@ jobs:
     name: Code Review
     steps:
       - name: DeepSeek Code Review
-        uses: danielcg-net/deepseek-review-gate@<RELEASE_COMMIT_SHA>
+        uses: danielcg-net/deepseek-review-gate@9347235fe47109d65860b076eb84835c062dcbcb
         with:
           chat-token: ${{ secrets.GITHUB_TOKEN }}       # Originally CHAT_TOKEN
           model: 'openai/gpt-5'

@@ -40,7 +40,12 @@ test('public workflows are least privilege and avoid privileged fork execution',
 
 test('consumer documentation prohibits privileged fork workflows and mutable action references', async () => {
   const readme = await read('README.md');
+  const integration = await read('docs/consumer-integration.md');
   assert.match(readme, /Do \*\*not\*\* use `pull_request_target`/);
-  assert.match(readme, /@<RELEASE_COMMIT_SHA>/);
+  assert.match(readme, /@9347235fe47109d65860b076eb84835c062dcbcb/);
   assert.doesNotMatch(readme, /uses: hustcer\/deepseek-review@/);
+  assert.match(integration, /pull_request_target/);
+  assert.match(integration, /@9347235fe47109d65860b076eb84835c062dcbcb/);
+  assert.match(integration, /reconcile-only: 'true'/);
+  assert.match(integration, /Reject external fork pull requests without secrets/);
 });

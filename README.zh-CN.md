@@ -60,7 +60,7 @@ jobs:
     name: Code Review
     steps:
       - name: DeepSeek Code Review
-        uses: danielcg-net/deepseek-review-gate@<RELEASE_COMMIT_SHA>
+        uses: danielcg-net/deepseek-review-gate@9347235fe47109d65860b076eb84835c062dcbcb
         with:
           chat-token: ${{ secrets.CHAT_TOKEN }}
 ```
@@ -108,7 +108,7 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'ai review')
     steps:
       - name: DeepSeek Code Review
-        uses: danielcg-net/deepseek-review-gate@<RELEASE_COMMIT_SHA>
+        uses: danielcg-net/deepseek-review-gate@9347235fe47109d65860b076eb84835c062dcbcb
         with:
           chat-token: ${{ secrets.CHAT_TOKEN }}
 ```
@@ -141,7 +141,7 @@ jobs:
     name: Code Review
     steps:
       - name: DeepSeek Code Review
-        uses: danielcg-net/deepseek-review-gate@<RELEASE_COMMIT_SHA>
+        uses: danielcg-net/deepseek-review-gate@9347235fe47109d65860b076eb84835c062dcbcb
         with:
           model: "deepseek-ai/DeepSeek-R1"
           base-url: "https://api.siliconflow.cn/v1"
@@ -178,7 +178,7 @@ jobs:
     name: Code Review
     steps:
       - name: DeepSeek Code Review
-        uses: danielcg-net/deepseek-review-gate@<RELEASE_COMMIT_SHA>
+        uses: danielcg-net/deepseek-review-gate@9347235fe47109d65860b076eb84835c062dcbcb
         with:
           chat-token: ${{ secrets.GITHUB_TOKEN }}      # 以前是CHAT_TOKEN
           model: 'openai/gpt-5'
