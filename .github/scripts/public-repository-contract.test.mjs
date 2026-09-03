@@ -28,6 +28,7 @@ test('public workflows are least privilege and avoid privileged fork execution',
   assert.doesNotMatch(workflowText, /self-hosted/);
   assert.match(workflowText, /persist-credentials: false/);
   assert.match(workflowText, /@[0-9a-f]{40}/);
+  assert.match(workflowText, /ref: c46af12bc6e3819b95d69f54f35526ca3e5810d6/);
   assert.match(workflowText, /name: YouTrack delivery policy/);
 });
 
