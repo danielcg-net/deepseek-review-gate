@@ -27,7 +27,8 @@ test('action uses an immutable setup action SHA', async () => {
   assert.match(reviewThreads, /let body = \$response\.body\? \| default \$response/);
   assert.match(reviewThreads, /export def serialize-active-fingerprints/);
   assert.match(reviewThreads, /\$fingerprints \| to json --raw/);
-  assert.match(action, /reconcile-machine-review-threads[\s\S]*finding-fingerprints=\(serialize-active-fingerprints \$active\)[\s\S]*exit 0/);
+  assert.match(action, /reconcile-machine-review-threads[\s\S]*\['finding-fingerprints=' \(serialize-active-fingerprints \$active\)\] \| str join '' \| save --append \$env\.GITHUB_OUTPUT[\s\S]*exit 0/);
+  assert.doesNotMatch(action, /\$'finding-fingerprints=.*\$active/);
 });
 
 test('public workflows are least privilege and avoid privileged fork execution', async () => {

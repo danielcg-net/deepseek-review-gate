@@ -152,7 +152,7 @@ runs:
             use review-threads.nu [parse-active-fingerprints, reconcile-machine-review-threads, serialize-active-fingerprints]
             let active = parse-active-fingerprints $env.ACTIVE_FINGERPRINTS_INPUT
             reconcile-machine-review-threads $env.REPO_INPUT ($env.PR_NUMBER_INPUT | into int) $active --reviewer-login $env.REVIEWER_LOGIN_INPUT --resolve-stale
-            $'finding-fingerprints=(serialize-active-fingerprints $active)' | save --append $env.GITHUB_OUTPUT
+            ['finding-fingerprints=' (serialize-active-fingerprints $active)] | str join '' | save --append $env.GITHUB_OUTPUT
           '
           exit 0
         }
