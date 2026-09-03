@@ -96,9 +96,17 @@ def graphql [query: string, variables: record] {
   parse-graphql-response $response
 }
 
+export def machine-reviewer-matches [actual: string, configured: string] {
+  if $configured in ['github-actions', 'github-actions[bot]'] {
+    $actual in ['github-actions', 'github-actions[bot]']
+  } else {
+    $actual == $configured
+  }
+}
+
 def thread-fingerprint [thread: record, reviewer_login: string] {
   let root = $thread.comments.nodes? | default [] | first | default {}
-  if (($root.author.login? | default '') != $reviewer_login) { return null }
+  if not (machine-reviewer-matches ($root.author.login? | default '') $reviewer_login) { return null }
   let body = $root.body? | default ''
   if not ($body | str contains $MARKER_PREFIX) { return null }
   let fingerprint = ($body | split row $MARKER_PREFIX | last | split row $MARKER_SUFFIX | first | str trim)
