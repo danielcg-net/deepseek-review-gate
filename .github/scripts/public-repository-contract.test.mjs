@@ -28,6 +28,11 @@ test('public workflows are least privilege and avoid privileged fork execution',
   assert.doesNotMatch(workflowText, /self-hosted/);
   assert.match(workflowText, /persist-credentials: false/);
   assert.match(workflowText, /@[0-9a-f]{40}/);
+  for (const workflowName of ['ci.yml', 'release-verify.yml']) {
+    const workflow = await read(`.github/workflows/${workflowName}`);
+    assert.match(workflow, /ref: c46af12bc6e3819b95d69f54f35526ca3e5810d6/, `${workflowName} must pin NuTest by commit SHA`);
+    assert.match(workflow, /run-tests --path \$\{\{ github\.workspace \}\}\/tests/, `${workflowName} must run only this repository's tests`);
+  }
   assert.match(workflowText, /name: YouTrack delivery policy/);
 });
 

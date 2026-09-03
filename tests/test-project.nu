@@ -76,10 +76,8 @@ def 'meta：the action tag matches the package version' [] {
 
 @test
 def 'meta：the READMEs point at the current major tag' [] {
-  let meta = open meta.json
-  let major = $meta.actionVer | split row '.' | first
   for readme in ['README.md', 'README.zh-CN.md'] {
     let content = open -r $readme
-    assert ($content | str contains $'hustcer/deepseek-review@($major)') $'($readme) does not reference ($major)'
+    assert ($content | str contains 'danielcg-net/deepseek-review-gate@<RELEASE_COMMIT_SHA>') $'($readme) does not pin the independent fork to an immutable release commit'
   }
 }
