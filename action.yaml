@@ -149,11 +149,11 @@ runs:
         # Let the child Nu parser receive the runtime container-side action path before `use`.
         if $env.RECONCILE_ONLY_INPUT == 'true' {
           ^nu -I ($env.GITHUB_ACTION_PATH | path join nu) -c '
-            use review-threads.nu [parse-active-fingerprints, reconcile-machine-review-threads]
+            use review-threads.nu [parse-active-fingerprints, reconcile-machine-review-threads, serialize-active-fingerprints]
             let active = parse-active-fingerprints $env.ACTIVE_FINGERPRINTS_INPUT
             reconcile-machine-review-threads $env.REPO_INPUT ($env.PR_NUMBER_INPUT | into int) $active --reviewer-login $env.REVIEWER_LOGIN_INPUT --resolve-stale
+            $'finding-fingerprints=(serialize-active-fingerprints $active)' | save --append $env.GITHUB_OUTPUT
           '
-          $'finding-fingerprints=($env.ACTIVE_FINGERPRINTS_INPUT)' | save --append $env.GITHUB_OUTPUT
           exit 0
         }
         ^nu -I ($env.GITHUB_ACTION_PATH | path join nu) -c '

@@ -65,6 +65,11 @@ export def parse-active-fingerprints [serialized: string] {
   }
 }
 
+# Serialize fingerprints as a single JSON line suitable for GitHub's GITHUB_OUTPUT file.
+export def serialize-active-fingerprints [fingerprints: list<string>] {
+  $fingerprints | to json --raw
+}
+
 def split-repo [repo: string] {
   let parts = $repo | split row '/'
   if (($parts | length) != 2) { fail 'repo must be owner/name.' }

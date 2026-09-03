@@ -1,6 +1,6 @@
 use std/assert
 use std/testing *
-use ../nu/review-threads.nu [parse-active-fingerprints, parse-graphql-response, parse-machine-findings]
+use ../nu/review-threads.nu [parse-active-fingerprints, parse-graphql-response, parse-machine-findings, serialize-active-fingerprints]
 
 const FINDING = {
   severity: 'warning'
@@ -37,6 +37,15 @@ def 'machine findings：requires a fingerprint array for reconcile-only mode' []
   assert equal (parse-active-fingerprints ([$fingerprint] | to json)) [$fingerprint]
   let malformed = try { parse-active-fingerprints '["not-a-fingerprint"]'; false } catch { true }
   assert equal $malformed true
+}
+
+@test
+def 'machine findings：serializes action output as compact JSON on one line' [] {
+  let fingerprint = (parse-machine-findings ({ findings: [$FINDING] } | to json) | first).fingerprint
+  let serialized = serialize-active-fingerprints [$fingerprint]
+  assert equal $serialized $'["($fingerprint)"]'
+  assert equal (parse-active-fingerprints $serialized) [$fingerprint]
+  assert equal (serialize-active-fingerprints []) '[]'
 }
 
 @test
