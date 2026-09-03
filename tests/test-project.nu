@@ -87,6 +87,6 @@ def 'meta：the action tag matches the package version' [] {
 def 'meta：the READMEs pin the independently verified release commit' [] {
   for readme in ['README.md', 'README.zh-CN.md'] {
     let content = open -r $readme
-    assert ($content | str contains 'danielcg-net/deepseek-review-gate@9347235fe47109d65860b076eb84835c062dcbcb') $'($readme) does not pin the independent fork to the documented immutable release commit'
+    assert ($content | str contains 'danielcg-net/deepseek-review-gate@2ebad6fd0146171a495fe45e30a813d3a08b87c4') $'($readme) does not pin the independent fork to the documented immutable release commit'
   }
 }

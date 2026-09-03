@@ -1,12 +1,12 @@
 # Consumer integration
 
-This guide applies to release `v1.21.0-bizyeet.2`, commit `9347235fe47109d65860b076eb84835c062dcbcb`. Pin the commit SHA in every consuming workflow; release tags are documentation, not a supply-chain pin.
+This guide applies to release `v1.21.0-bizyeet.7`, commit `2ebad6fd0146171a495fe45e30a813d3a08b87c4`. Pin the commit SHA in every consuming workflow; release tags are documentation, not a supply-chain pin.
 
 ## Security boundary
 
 Use only the ordinary `pull_request` event. Do not use `pull_request_target`, self-hosted runners, or checkout and execute contributor code in a job that can read the DeepSeek secret.
 
-The action reads the pull-request diff through GitHub's API itself. It does not require a checkout step. Keep repository secrets in the consuming repository only; never pass them through a workflow input, artifact, log, or reusable-workflow output.
+The action reads the pull-request diff through GitHub's API itself. It does not require a checkout step. Keep repository secrets in the consuming repository only; never pass them through a workflow input, artifact, log, or reusable-workflow output. GitHub currently requires `contents: write` as well as `pull-requests: write` to resolve a review thread through GraphQL; grant that scope only to this dedicated no-checkout review job.
 
 GitHub withholds repository secrets from external fork pull requests. This guide therefore fails those runs closed. A maintainer must not work around that boundary with `pull_request_target`. A future API-only public-fork design needs an independent security review before it is enabled.
 
@@ -22,7 +22,8 @@ on:
     types: [opened, reopened, synchronize, ready_for_review]
 
 permissions:
-  contents: read
+  # Required by GitHub's resolveReviewThread GraphQL mutation.
+  contents: write
   pull-requests: write
 
 concurrency:
@@ -42,7 +43,7 @@ jobs:
           exit 1
       - name: Create and reconcile machine review threads
         if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
-        uses: danielcg-net/deepseek-review-gate@9347235fe47109d65860b076eb84835c062dcbcb
+        uses: danielcg-net/deepseek-review-gate@2ebad6fd0146171a495fe45e30a813d3a08b87c4 # v1.21.0-bizyeet.7
         with:
           chat-token: ${{ secrets.DEEPSEEK_API_KEY }}
           github-token: ${{ github.token }}
@@ -56,7 +57,7 @@ For multiple partial reviewers, set `reconcile-threads: 'false'` on every partia
 
 ```yaml
       - name: Reconcile the complete review result
-        uses: danielcg-net/deepseek-review-gate@9347235fe47109d65860b076eb84835c062dcbcb
+        uses: danielcg-net/deepseek-review-gate@2ebad6fd0146171a495fe45e30a813d3a08b87c4 # v1.21.0-bizyeet.7
         with:
           chat-token: ${{ secrets.DEEPSEEK_API_KEY }}
           github-token: ${{ github.token }}

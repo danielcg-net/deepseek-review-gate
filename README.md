@@ -10,12 +10,13 @@ Pin this action to an immutable release commit SHA. The consuming repository own
 
 ```yaml
 permissions:
-  contents: read
+  # GitHub requires this scope to resolve a review thread via GraphQL.
+  contents: write
   pull-requests: write
 
 steps:
   - name: DeepSeek review
-    uses: danielcg-net/deepseek-review-gate@9347235fe47109d65860b076eb84835c062dcbcb
+    uses: danielcg-net/deepseek-review-gate@2ebad6fd0146171a495fe45e30a813d3a08b87c4 # v1.21.0-bizyeet.7
     with:
       chat-token: ${{ secrets.DEEPSEEK_API_KEY }}
 ```
@@ -73,8 +74,9 @@ on:
       - reopened # Triggers when a PR is reopened
       - synchronize # Triggers when a commit is pushed to the PR
 
-# fix: GraphQL: Resource not accessible by integration (addComment) error
 permissions:
+  # Required when reconcile-threads remains enabled (the default).
+  contents: write
   pull-requests: write
 
 jobs:
@@ -84,7 +86,7 @@ jobs:
     name: Code Review
     steps:
       - name: DeepSeek Code Review
-        uses: danielcg-net/deepseek-review-gate@9347235fe47109d65860b076eb84835c062dcbcb
+        uses: danielcg-net/deepseek-review-gate@2ebad6fd0146171a495fe45e30a813d3a08b87c4 # v1.21.0-bizyeet.7
         with:
           chat-token: ${{ secrets.CHAT_TOKEN }}
 ```
@@ -119,8 +121,9 @@ on:
     types:
       - labeled # Triggers when a label is added to the PR
 
-# fix: GraphQL: Resource not accessible by integration (addComment) error
 permissions:
+  # Required when reconcile-threads remains enabled (the default).
+  contents: write
   pull-requests: write
 
 jobs:
@@ -132,7 +135,7 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'ai review')
     steps:
       - name: DeepSeek Code Review
-        uses: danielcg-net/deepseek-review-gate@9347235fe47109d65860b076eb84835c062dcbcb
+        uses: danielcg-net/deepseek-review-gate@2ebad6fd0146171a495fe45e30a813d3a08b87c4 # v1.21.0-bizyeet.7
         with:
           chat-token: ${{ secrets.CHAT_TOKEN }}
 ```
@@ -156,6 +159,8 @@ on:
       - created # Triggers when a comment is created on a PR
 
 permissions:
+  # Required when reconcile-threads remains enabled (the default).
+  contents: write
   pull-requests: write
 
 jobs:
@@ -165,7 +170,7 @@ jobs:
     name: Code Review
     steps:
       - name: DeepSeek Code Review
-        uses: danielcg-net/deepseek-review-gate@9347235fe47109d65860b076eb84835c062dcbcb
+        uses: danielcg-net/deepseek-review-gate@2ebad6fd0146171a495fe45e30a813d3a08b87c4 # v1.21.0-bizyeet.7
         with:
           model: "deepseek-ai/DeepSeek-R1"
           base-url: "https://api.siliconflow.cn/v1"
@@ -192,6 +197,8 @@ _Github Models_ offers a generous free tier, and it is enough for basic code rev
 
 ```yaml
 permissions:
+  # Required when reconcile-threads remains enabled (the default).
+  contents: write
   pull-requests: write
   models: read   # Required for using Github Models
 
@@ -202,7 +209,7 @@ jobs:
     name: Code Review
     steps:
       - name: DeepSeek Code Review
-        uses: danielcg-net/deepseek-review-gate@9347235fe47109d65860b076eb84835c062dcbcb
+        uses: danielcg-net/deepseek-review-gate@2ebad6fd0146171a495fe45e30a813d3a08b87c4 # v1.21.0-bizyeet.7
         with:
           chat-token: ${{ secrets.GITHUB_TOKEN }}       # Originally CHAT_TOKEN
           model: 'openai/gpt-5'

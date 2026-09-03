@@ -63,7 +63,7 @@ inputs:
   reconcile-threads:
     required: false
     default: 'true'
-    description: "Resolve this action's stale matching review threads after a complete clean review. Set false for partial review partitions."
+    description: "Resolve this action's stale matching review threads after a complete clean review. Requires contents: write and pull-requests: write; set false for partial review partitions."
   reconcile-only:
     required: false
     default: 'false'
