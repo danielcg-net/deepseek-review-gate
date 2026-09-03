@@ -158,17 +158,19 @@ runs:
         }
         ^nu -I ($env.GITHUB_ACTION_PATH | path join nu) -c '
           use review.nu *
-          deepseek-review $env.CHAT_TOKEN_INPUT
-            --model $env.MODEL_INPUT
-            --repo $env.REPO_INPUT
-            --pr-number $env.PR_NUMBER_INPUT
-            --gh-token $env.GH_TOKEN_INPUT
-            --base-url $env.BASE_URL_INPUT
-            --max-length (try { $env.MAX_LENGTH_INPUT | into int } catch { 0 })
-            --sys-prompt $env.SYS_PROMPT_INPUT
-            --user-prompt $env.USER_PROMPT_INPUT
-            --temperature (try { $env.TEMPERATURE_INPUT | into float } catch { null })
-            --include $env.INCLUDE_PATTERNS_INPUT
-            --exclude $env.EXCLUDE_PATTERNS_INPUT
-            --comment $env.COMMENT_BODY_INPUT
+          (
+            deepseek-review $env.CHAT_TOKEN_INPUT
+              --model $env.MODEL_INPUT
+              --repo $env.REPO_INPUT
+              --pr-number $env.PR_NUMBER_INPUT
+              --gh-token $env.GH_TOKEN_INPUT
+              --base-url $env.BASE_URL_INPUT
+              --max-length (try { $env.MAX_LENGTH_INPUT | into int } catch { 0 })
+              --sys-prompt $env.SYS_PROMPT_INPUT
+              --user-prompt $env.USER_PROMPT_INPUT
+              --temperature (try { $env.TEMPERATURE_INPUT | into float } catch { null })
+              --include $env.INCLUDE_PATTERNS_INPUT
+              --exclude $env.EXCLUDE_PATTERNS_INPUT
+              --comment $env.COMMENT_BODY_INPUT
+          )
         '
