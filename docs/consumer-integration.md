@@ -35,13 +35,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Reject external fork pull requests without secrets
-        if: github.event.pull_request.head.repo.fork
+      - name: Reject external repository pull requests without secrets
+        if: github.event.pull_request.head.repo.full_name != github.repository
         run: |
           echo "DeepSeek review cannot safely access repository secrets for an external fork pull request."
           exit 1
       - name: Create and reconcile machine review threads
-        if: ${{ !github.event.pull_request.head.repo.fork }}
+        if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
         uses: danielcg-net/deepseek-review-gate@9347235fe47109d65860b076eb84835c062dcbcb
         with:
           chat-token: ${{ secrets.DEEPSEEK_API_KEY }}
