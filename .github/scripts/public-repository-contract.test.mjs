@@ -49,5 +49,6 @@ test('consumer documentation prohibits privileged fork workflows and mutable act
   assert.match(integration, /pull_request_target/);
   assert.match(integration, /@9347235fe47109d65860b076eb84835c062dcbcb/);
   assert.match(integration, /reconcile-only: 'true'/);
-  assert.match(integration, /Reject external fork pull requests without secrets/);
+  assert.match(integration, /Reject external repository pull requests without secrets/);
+  assert.match(integration, /github\.event\.pull_request\.head\.repo\.full_name != github\.repository/);
 });
