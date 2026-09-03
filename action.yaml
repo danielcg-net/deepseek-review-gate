@@ -60,6 +60,27 @@ inputs:
     required: false
     default: 'OWNER,MEMBER,COLLABORATOR'
     description: 'Comma-separated author_association values allowed to trigger review via PR comment. Default: OWNER,MEMBER,COLLABORATOR.'
+  reconcile-threads:
+    required: false
+    default: 'true'
+    description: "Resolve this action's stale matching review threads after a complete clean review. Set false for partial review partitions."
+  reconcile-only:
+    required: false
+    default: 'false'
+    description: 'Skip provider review and reconcile existing bot-owned threads from active-fingerprints.'
+  active-fingerprints:
+    required: false
+    default: '[]'
+    description: 'JSON array of active finding fingerprints for reconcile-only mode.'
+  reviewer-login:
+    required: false
+    default: 'github-actions[bot]'
+    description: "GitHub login allowed to own and resolve this action's review threads."
+
+outputs:
+  finding-fingerprints:
+    description: 'JSON array of stable fingerprints emitted by this review run.'
+    value: ${{ steps.machine-review.outputs.finding-fingerprints }}
 
 runs:
   using: 'composite'
@@ -70,6 +91,7 @@ runs:
         version: 0.115.1
 
     - name: DeepSeek Code Review
+      id: machine-review
       shell: nu {0}
       env:
         WATCH_MENTION: ${{ inputs.watch-mention }}
@@ -85,6 +107,10 @@ runs:
         TEMPERATURE_INPUT: ${{ inputs.temperature }}
         REPO_INPUT: ${{ github.repository }}
         ALLOWED_ASSOCIATIONS_INPUT: ${{ inputs.allowed-associations }}
+        RECONCILE_THREADS_INPUT: ${{ inputs.reconcile-threads }}
+        RECONCILE_ONLY_INPUT: ${{ inputs.reconcile-only }}
+        ACTIVE_FINGERPRINTS_INPUT: ${{ inputs.active-fingerprints }}
+        REVIEWER_LOGIN_INPUT: ${{ inputs.reviewer-login }}
       run: |
         let event = (open $env.GITHUB_EVENT_PATH)
         let pr = $event.pull_request?.number? | default $event.issue?.number? | default '' | into string
@@ -121,9 +147,18 @@ runs:
         $env.PR_NUMBER_INPUT = $pr
         $env.COMMENT_BODY_INPUT = $commentBody
         # Let the child Nu parser receive the runtime container-side action path before `use`.
-        ^nu -I ($env.GITHUB_ACTION_PATH | path join nu) -c "
+        if $env.RECONCILE_ONLY_INPUT == 'true' {
+          ^nu -I ($env.GITHUB_ACTION_PATH | path join nu) -c '
+            use review-threads.nu [parse-active-fingerprints, reconcile-machine-review-threads]
+            let active = parse-active-fingerprints $env.ACTIVE_FINGERPRINTS_INPUT
+            reconcile-machine-review-threads $env.REPO_INPUT ($env.PR_NUMBER_INPUT | into int) $active --reviewer-login $env.REVIEWER_LOGIN_INPUT --resolve-stale
+          '
+          $'finding-fingerprints=($env.ACTIVE_FINGERPRINTS_INPUT)' | save --append $env.GITHUB_OUTPUT
+          exit 0
+        }
+        ^nu -I ($env.GITHUB_ACTION_PATH | path join nu) -c '
           use review.nu *
-          (deepseek-review $env.CHAT_TOKEN_INPUT
+          deepseek-review $env.CHAT_TOKEN_INPUT
             --model $env.MODEL_INPUT
             --repo $env.REPO_INPUT
             --pr-number $env.PR_NUMBER_INPUT
@@ -136,5 +171,4 @@ runs:
             --include $env.INCLUDE_PATTERNS_INPUT
             --exclude $env.EXCLUDE_PATTERNS_INPUT
             --comment $env.COMMENT_BODY_INPUT
-          )
-        "
+        '

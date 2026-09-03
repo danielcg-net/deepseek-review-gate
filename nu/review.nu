@@ -27,6 +27,7 @@
 
 use std-rfc/kv *
 use diff.nu [get-diff]
+use review-threads.nu [parse-machine-findings, reconcile-machine-review-threads]
 use common.nu [
   ECODE, NO_TOKEN_TIP, hr-line, is-installed, windows?, mac?,
   compare-ver, compact-record, git-check, has-ref, GITHUB_API_BASE
@@ -203,6 +204,13 @@ export def --env deepseek-review [
   }
   print $'Review content length: (ansi g)($length)(ansi reset), current max length: (ansi g)($max_length)(ansi reset)'
   let sys_prompt = $sys_prompt | default $env.SYSTEM_PROMPT? | default $DEFAULT_OPTIONS.SYS_PROMPT
+  let sys_prompt = if $is_action {
+    [
+      $sys_prompt
+      ''
+      'Return exactly one JSON object and nothing else: {"findings":[{"severity":"critical|warning|suggestion","path":"changed/file","line":positive_changed_line,"rule":"stable rule identifier","message":"actionable explanation"}]}. Return {"findings":[]} when there are no actionable findings. Never emit Markdown, prose outside JSON, or findings without an exact changed-file path and changed-file line.'
+    ] | str join "\n"
+  } else { $sys_prompt }
   let user_prompt = $user_prompt | default $env.USER_PROMPT? | default $DEFAULT_OPTIONS.USER_PROMPT
   let user_content = if ($comment | is-not-empty) {
     $"($user_prompt):\n($content)\n\nAdditional context from PR comment \(enclosed in <comment> tags\):\n<comment>\n($comment)\n</comment>"
@@ -245,8 +253,18 @@ export def --env deepseek-review [
 
   match $output_mode {
     'action' => {
-      submit-review-to-pr $repo $pr_number $result
-      print $'✅ Code review finished！PR (ansi g)#($pr_number)(ansi reset) review result was submitted as a review.'
+      let findings = parse-machine-findings $review
+      let fingerprints = $findings | get fingerprint
+      let reconcile = ($env.RECONCILE_THREADS_INPUT? | default 'true') == 'true'
+      if $reconcile {
+        reconcile-machine-review-threads $repo ($pr_number | into int) $fingerprints $findings --resolve-stale
+      } else {
+        reconcile-machine-review-threads $repo ($pr_number | into int) $fingerprints $findings
+      }
+      if ($env.GITHUB_OUTPUT? | is-not-empty) {
+        $'finding-fingerprints=($fingerprints | to json)' | save --append $env.GITHUB_OUTPUT
+      }
+      print $'✅ Code review finished！PR (ansi g)#($pr_number)(ansi reset) findings were reconciled as machine review threads.'
     }
     'file' => { write-review-to-file $output $setting $result $response }
     _ => { print $'Code Review Result:'; hr-line; print $result }
