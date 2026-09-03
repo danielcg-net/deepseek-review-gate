@@ -71,12 +71,24 @@ def split-repo [repo: string] {
   { owner: ($parts | get 0), name: ($parts | get 1) }
 }
 
+export def parse-graphql-response [response: any] {
+  # `http post --full` returns `{ status, headers, body }`; allow direct payloads
+  # as well so the boundary is testable without a network call.
+  let body = $response.body? | default $response
+  let payload = if (($body | describe) | str starts-with 'string') {
+    try { $body | from json } catch { fail 'GitHub GraphQL returned a non-JSON response body.' }
+  } else { $body }
+  if ($payload.errors? | is-not-empty) { fail $'GitHub GraphQL returned errors: ($payload.errors | to json)' }
+  let data = $payload.data?
+  if $data == null { fail $'GitHub GraphQL response has no data: ($payload | to json)' }
+  $data
+}
+
 def graphql [query: string, variables: record] {
   let response = try {
     http post -e -f -t application/json -H (github-headers) $GRAPHQL_URL { query: $query, variables: $variables }
   } catch {|err| fail $'GitHub GraphQL request failed: ($err.msg? | default $err)' }
-  if ($response.errors? | is-not-empty) { fail $'GitHub GraphQL returned errors: ($response.errors | to json)' }
-  $response.data
+  parse-graphql-response $response
 }
 
 def thread-fingerprint [thread: record, reviewer_login: string] {

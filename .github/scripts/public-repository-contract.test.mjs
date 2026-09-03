@@ -22,6 +22,9 @@ test('action uses an immutable setup action SHA', async () => {
   assert.match(action, /reconcile-only:/);
   assert.match(action, /\(\n            deepseek-review \$env\.CHAT_TOKEN_INPUT/);
   assert.match(action, /--comment \$env\.COMMENT_BODY_INPUT\n          \)/);
+  const reviewThreads = await read('nu/review-threads.nu');
+  assert.match(reviewThreads, /export def parse-graphql-response/);
+  assert.match(reviewThreads, /let body = \$response\.body\? \| default \$response/);
 });
 
 test('public workflows are least privilege and avoid privileged fork execution', async () => {

@@ -1,6 +1,6 @@
 use std/assert
 use std/testing *
-use ../nu/review-threads.nu [parse-active-fingerprints, parse-machine-findings]
+use ../nu/review-threads.nu [parse-active-fingerprints, parse-graphql-response, parse-machine-findings]
 
 const FINDING = {
   severity: 'warning'
@@ -37,4 +37,14 @@ def 'machine findings：requires a fingerprint array for reconcile-only mode' []
   assert equal (parse-active-fingerprints ([$fingerprint] | to json)) [$fingerprint]
   let malformed = try { parse-active-fingerprints '["not-a-fingerprint"]'; false } catch { true }
   assert equal $malformed true
+}
+
+@test
+def 'GitHub GraphQL：normalizes full HTTP responses and fails closed without data' [] {
+  assert equal (parse-graphql-response { status: 200, body: { data: { ok: true } } }) { ok: true }
+  assert equal (parse-graphql-response { data: { ok: true } }) { ok: true }
+  let missing_data = try { parse-graphql-response { status: 403, body: { message: 'Resource not accessible' } }; false } catch { true }
+  assert equal $missing_data true
+  let graphql_error = try { parse-graphql-response { status: 200, body: { errors: [{ message: 'forbidden' }] } }; false } catch { true }
+  assert equal $graphql_error true
 }
