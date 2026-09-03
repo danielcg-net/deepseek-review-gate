@@ -29,7 +29,7 @@ jobs:
       - name: Verify action tests
         shell: nu {0}
         run: |
-          use nutest/nutest
+          use ${{ github.workspace }}/nutest/nutest
           use nu/util.nu [prepare-awk]
           prepare-awk
           nutest run-tests --fail --display terminal
