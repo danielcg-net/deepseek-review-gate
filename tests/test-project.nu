@@ -71,7 +71,7 @@ def 'meta：the action tag matches the package version' [] {
   let meta = open meta.json
   let parts = $meta.version | split row '.'
   assert equal $meta.actionVer $'v($parts.0).($parts.1)'
-  assert equal $meta.name 'deepseek-review'
+  assert equal $meta.name 'deepseek-review-gate'
 }
 
 @test
