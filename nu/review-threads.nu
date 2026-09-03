@@ -33,7 +33,8 @@ export def parse-machine-findings [review: string] {
   let parsed = try { $review | from json } catch { fail 'Machine review must be a JSON object with a findings array.' }
   let findings = $parsed.findings?
   if $findings == null { fail 'Machine review JSON is missing findings.' }
-  if not (($findings | describe) | str starts-with 'list') { fail 'Machine review findings must be an array.' }
+  let findings_type = $findings | describe
+  if not (($findings_type | str starts-with 'list') or ($findings_type | str starts-with 'table')) { fail 'Machine review findings must be an array.' }
 
   let normalized = $findings | each {|finding|
     let severity = $finding.severity? | default '' | into string | str downcase
