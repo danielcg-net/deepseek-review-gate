@@ -36,6 +36,6 @@ jobs:
           use ${{ github.workspace }}/nutest/mod.nu [run-tests]
           use ${{ github.workspace }}/nu/util.nu [prepare-awk]
           prepare-awk
-          run-tests --fail --display terminal
+          run-tests --path ${{ github.workspace }}/tests --fail --display terminal
       - name: Verify action metadata
         run: node --test .github/scripts/public-repository-contract.test.mjs
