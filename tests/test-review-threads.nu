@@ -1,6 +1,6 @@
 use std/assert
 use std/testing *
-use ../nu/review-threads.nu [parse-active-fingerprints, parse-graphql-response, parse-machine-findings, serialize-active-fingerprints]
+use ../nu/review-threads.nu [machine-reviewer-matches, parse-active-fingerprints, parse-graphql-response, parse-machine-findings, serialize-active-fingerprints]
 
 const FINDING = {
   severity: 'warning'
@@ -46,6 +46,14 @@ def 'machine findings：serializes action output as compact JSON on one line' []
   assert equal $serialized $'["($fingerprint)"]'
   assert equal (parse-active-fingerprints $serialized) [$fingerprint]
   assert equal (serialize-active-fingerprints []) '[]'
+}
+
+@test
+def 'machine findings：normalizes only GitHub Actions reviewer aliases' [] {
+  assert equal (machine-reviewer-matches 'github-actions' 'github-actions[bot]') true
+  assert equal (machine-reviewer-matches 'github-actions[bot]' 'github-actions') true
+  assert equal (machine-reviewer-matches 'github-actions' 'other-bot[bot]') false
+  assert equal (machine-reviewer-matches 'other-bot[bot]' 'other-bot[bot]') true
 }
 
 @test
