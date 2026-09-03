@@ -25,6 +25,9 @@ test('action uses an immutable setup action SHA', async () => {
   const reviewThreads = await read('nu/review-threads.nu');
   assert.match(reviewThreads, /export def parse-graphql-response/);
   assert.match(reviewThreads, /let body = \$response\.body\? \| default \$response/);
+  assert.match(reviewThreads, /export def serialize-active-fingerprints/);
+  assert.match(reviewThreads, /\$fingerprints \| to json --raw/);
+  assert.match(action, /reconcile-machine-review-threads[\s\S]*finding-fingerprints=\(serialize-active-fingerprints \$active\)[\s\S]*exit 0/);
 });
 
 test('public workflows are least privilege and avoid privileged fork execution', async () => {

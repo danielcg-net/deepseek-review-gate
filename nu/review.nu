@@ -27,7 +27,7 @@
 
 use std-rfc/kv *
 use diff.nu [get-diff]
-use review-threads.nu [parse-machine-findings, reconcile-machine-review-threads]
+use review-threads.nu [parse-machine-findings, reconcile-machine-review-threads, serialize-active-fingerprints]
 use common.nu [
   ECODE, NO_TOKEN_TIP, hr-line, is-installed, windows?, mac?,
   compare-ver, compact-record, git-check, has-ref, GITHUB_API_BASE
@@ -262,7 +262,7 @@ export def --env deepseek-review [
         reconcile-machine-review-threads $repo ($pr_number | into int) $fingerprints $findings
       }
       if ($env.GITHUB_OUTPUT? | is-not-empty) {
-        $'finding-fingerprints=($fingerprints | to json)' | save --append $env.GITHUB_OUTPUT
+        $'finding-fingerprints=(serialize-active-fingerprints $fingerprints)' | save --append $env.GITHUB_OUTPUT
       }
       print $'✅ Code review finished！PR (ansi g)#($pr_number)(ansi reset) findings were reconciled as machine review threads.'
     }
