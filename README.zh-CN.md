@@ -43,7 +43,7 @@
 ```yaml
 name: Code Review
 on:
-  pull_request_target:
+  pull_request:
     types:
       - opened # Triggers when a PR is opened
       - reopened # Triggers when a PR is reopened
@@ -60,7 +60,7 @@ jobs:
     name: Code Review
     steps:
       - name: DeepSeek Code Review
-        uses: hustcer/deepseek-review@v1
+        uses: danielcg-net/deepseek-review-gate@<RELEASE_COMMIT_SHA>
         with:
           chat-token: ${{ secrets.CHAT_TOKEN }}
 ```
@@ -91,7 +91,7 @@ jobs:
 ```yaml
 name: Code Review
 on:
-  pull_request_target:
+  pull_request:
     types:
       - labeled # Triggers when a label is added to the PR
 
@@ -108,7 +108,7 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'ai review')
     steps:
       - name: DeepSeek Code Review
-        uses: hustcer/deepseek-review@v1
+        uses: danielcg-net/deepseek-review-gate@<RELEASE_COMMIT_SHA>
         with:
           chat-token: ${{ secrets.CHAT_TOKEN }}
 ```
@@ -122,7 +122,7 @@ jobs:
 ```yaml
 name: Code Review
 on:
-  pull_request_target:
+  pull_request:
     types:
       - opened
       - reopened
@@ -141,7 +141,7 @@ jobs:
     name: Code Review
     steps:
       - name: DeepSeek Code Review
-        uses: hustcer/deepseek-review@v1
+        uses: danielcg-net/deepseek-review-gate@<RELEASE_COMMIT_SHA>
         with:
           model: "deepseek-ai/DeepSeek-R1"
           base-url: "https://api.siliconflow.cn/v1"
@@ -178,7 +178,7 @@ jobs:
     name: Code Review
     steps:
       - name: DeepSeek Code Review
-        uses: hustcer/deepseek-review@v1
+        uses: danielcg-net/deepseek-review-gate@<RELEASE_COMMIT_SHA>
         with:
           chat-token: ${{ secrets.GITHUB_TOKEN }}      # 以前是CHAT_TOKEN
           model: 'openai/gpt-5'

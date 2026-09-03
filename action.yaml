@@ -6,9 +6,9 @@
 #   - https://docs.github.com/cn/actions/creating-actions/metadata-syntax-for-github-actions
 #   - https://docs.github.com/en/actions/creating-actions/creating-a-composite-action
 
-name: 'DeepSeek CR'
-author: 'hustcer'
-description: '🚀 Sharpen Your Code, Ship with Confidence – Elevate Your Workflow with DeepSeek Code Review 🚀'
+name: 'DeepSeek Review Gate'
+author: 'danielcg-net'
+description: 'Fail-closed DeepSeek pull-request review action maintained independently by danielcg-net.'
 
 branding:
   icon: 'eye'
@@ -65,7 +65,7 @@ runs:
   using: 'composite'
   steps:
     - name: Setup Nu
-      uses: hustcer/setup-nu@v3.27
+      uses: hustcer/setup-nu@9215c80adb545a85c419d5085b76eb6d082f49e7 # v3.27
       with:
         version: 0.115.1
 

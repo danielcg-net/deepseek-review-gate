@@ -1,0 +1,49 @@
+name: YouTrack delivery policy
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  validate:
+    name: Validate YouTrack delivery
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Validate branch, pull-request title, and commits
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const pull = context.payload.pull_request;
+            if (!pull) {
+              core.setFailed('No pull request payload found.');
+              return;
+            }
+            if (pull.user?.login === 'dependabot[bot]') {
+              core.info('Dependabot dependency update: delivery identifier validation is not required.');
+              return;
+            }
+            const match = pull.head.ref.match(/^(bizyeet-\d+)\/[a-z0-9][a-z0-9-]*$/);
+            if (!match) {
+              core.setFailed('Branch must be bizyeet-<id>/concise-description.');
+              return;
+            }
+            const issueId = match[1];
+            if (!pull.title.startsWith(`${issueId.toUpperCase()}: `)) {
+              core.setFailed(`PR title must begin ${issueId.toUpperCase()}: `);
+              return;
+            }
+            const commits = await github.paginate(github.rest.pulls.listCommits, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pull.number,
+              per_page: 100,
+            });
+            const invalid = commits.filter(({ commit }) => !commit.message.startsWith(`${issueId}: `));
+            if (invalid.length > 0) {
+              core.setFailed(`Every non-merge commit must begin ${issueId}: `);
+            }

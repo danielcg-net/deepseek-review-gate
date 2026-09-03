@@ -1,0 +1,37 @@
+name: Release Verification
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify a future release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Set up Nushell
+        uses: hustcer/setup-nu@9215c80adb545a85c419d5085b76eb6d082f49e7 # v3.27
+        with:
+          version: 0.115.1
+      - name: Checkout NuTest
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: vyadh/nutest
+          path: nutest
+          persist-credentials: false
+      - name: Verify action tests
+        shell: nu {0}
+        run: |
+          use nutest/nutest
+          use nu/util.nu [prepare-awk]
+          prepare-awk
+          nutest run-tests --fail --display terminal
+      - name: Verify action metadata
+        run: node --test .github/scripts/public-repository-contract.test.mjs

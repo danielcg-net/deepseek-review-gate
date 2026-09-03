@@ -1,0 +1,5 @@
+DeepSeek Review Gate is an independently maintained derivative of `hustcer/deepseek-review`.
+
+Source baseline: `hustcer/deepseek-review` commit `eccde2e9781008d795e366b951e313e37af88dd5` (v1.21), retrieved 2026-09-03.
+
+The upstream project is licensed under the MIT License. Its copyright notice is preserved in LICENSE.

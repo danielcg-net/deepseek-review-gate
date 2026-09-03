@@ -1,4 +1,24 @@
-# DeepSeek Code Review
+# DeepSeek Review Gate
+
+An independently maintained, MIT-licensed derivative of [`hustcer/deepseek-review`](https://github.com/hustcer/deepseek-review). The source baseline and attribution are recorded in [NOTICE](NOTICE).
+
+## Security model for public repositories
+
+Use this action only from the ordinary `pull_request` event. Do **not** use `pull_request_target`, self-hosted runners, or a workflow that checks out or executes contributor code with secrets.
+
+Pin this action to an immutable release commit SHA. The consuming repository owns the `DEEPSEEK_API_KEY` secret. GitHub does not provide repository secrets to pull requests from forks; such runs cannot perform provider review and must remain explicitly skipped or fail closed. A future API-only fork-PR design requires a separate security review.
+
+```yaml
+permissions:
+  contents: read
+  pull-requests: write
+
+steps:
+  - name: DeepSeek review
+    uses: danielcg-net/deepseek-review-gate@<RELEASE_COMMIT_SHA>
+    with:
+      chat-token: ${{ secrets.DEEPSEEK_API_KEY }}
+```
 
 ![Tests](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fgist.githubusercontent.com%2Fhustcer%2Fb99391ee59016b17d0befe3331387e89%2Fraw%2Ftest-summary.json&query=%24.total&label=Tests)
 ![Passed](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fgist.githubusercontent.com%2Fhustcer%2Fb99391ee59016b17d0befe3331387e89%2Fraw%2Ftest-summary.json&query=%24.passed&label=Passed&color=%2331c654)
@@ -45,7 +65,7 @@ Add a GitHub workflow with the following contents:
 ```yaml
 name: Code Review
 on:
-  pull_request_target:
+  pull_request:
     types:
       - opened # Triggers when a PR is opened
       - reopened # Triggers when a PR is reopened
@@ -62,7 +82,7 @@ jobs:
     name: Code Review
     steps:
       - name: DeepSeek Code Review
-        uses: hustcer/deepseek-review@v1
+        uses: danielcg-net/deepseek-review-gate@<RELEASE_COMMIT_SHA>
         with:
           chat-token: ${{ secrets.CHAT_TOKEN }}
 ```
@@ -93,7 +113,7 @@ If you don't want automatic code review on PR creation, you can choose to trigge
 ```yaml
 name: Code Review
 on:
-  pull_request_target:
+  pull_request:
     types:
       - labeled # Triggers when a label is added to the PR
 
@@ -110,7 +130,7 @@ jobs:
     if: contains(github.event.pull_request.labels.*.name, 'ai review')
     steps:
       - name: DeepSeek Code Review
-        uses: hustcer/deepseek-review@v1
+        uses: danielcg-net/deepseek-review-gate@<RELEASE_COMMIT_SHA>
         with:
           chat-token: ${{ secrets.CHAT_TOKEN }}
 ```
@@ -124,7 +144,7 @@ You can trigger code review by mentioning a specific string (e.g. `@github-actio
 ```yaml
 name: Code Review
 on:
-  pull_request_target:
+  pull_request:
     types:
       - opened
       - reopened
@@ -143,7 +163,7 @@ jobs:
     name: Code Review
     steps:
       - name: DeepSeek Code Review
-        uses: hustcer/deepseek-review@v1
+        uses: danielcg-net/deepseek-review-gate@<RELEASE_COMMIT_SHA>
         with:
           model: "deepseek-ai/DeepSeek-R1"
           base-url: "https://api.siliconflow.cn/v1"
@@ -180,7 +200,7 @@ jobs:
     name: Code Review
     steps:
       - name: DeepSeek Code Review
-        uses: hustcer/deepseek-review@v1
+        uses: danielcg-net/deepseek-review-gate@<RELEASE_COMMIT_SHA>
         with:
           chat-token: ${{ secrets.GITHUB_TOKEN }}       # Originally CHAT_TOKEN
           model: 'openai/gpt-5'
