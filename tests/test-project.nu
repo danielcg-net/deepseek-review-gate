@@ -65,6 +65,15 @@ def 'action：required inputs and branding stay declared' [] {
 }
 
 @test
+def 'action：the child Nu review invocation remains grouped across lines' [] {
+  let action = open -r action.yaml
+  assert ($action | str contains "          (\n            deepseek-review $env.CHAT_TOKEN_INPUT")
+    'The multiline DeepSeek invocation must be grouped for Nushell parsing.'
+  assert ($action | str contains "              --comment $env.COMMENT_BODY_INPUT\n          )")
+    'The grouped invocation must close after its final argument.'
+}
+
+@test
 def 'meta：the action tag matches the package version' [] {
   # `make-release` tags with `actionVer` and derives the floating major tag from
   # it, so a mismatch here ships a release under the wrong tag.

@@ -20,6 +20,8 @@ test('action uses an immutable setup action SHA', async () => {
   assert.doesNotMatch(action, /chat-token.*print/i);
   assert.match(action, /finding-fingerprints:/);
   assert.match(action, /reconcile-only:/);
+  assert.match(action, /\(\n            deepseek-review \$env\.CHAT_TOKEN_INPUT/);
+  assert.match(action, /--comment \$env\.COMMENT_BODY_INPUT\n          \)/);
 });
 
 test('public workflows are least privilege and avoid privileged fork execution', async () => {
