@@ -25,12 +25,11 @@ jobs:
         with:
           repository: vyadh/nutest
           ref: c46af12bc6e3819b95d69f54f35526ca3e5810d6
-          path: nutest
+          path: nutest-source
           persist-credentials: false
-      - name: Install NuTest module
+      - name: Install NuTest module in the workspace
         run: |
-          mkdir -p "$HOME/.config/nushell/lib"
-          cp -R nutest/nutest "$HOME/.config/nushell/lib/nutest"
+          cp -R nutest-source/nutest nutest
       - name: Verify action tests
         shell: nu {0}
         run: |
