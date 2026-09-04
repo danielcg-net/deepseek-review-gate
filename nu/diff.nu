@@ -154,9 +154,15 @@ def apply-file-filters [
   let awk_bin = (prepare-awk)
   let outdated_awk = $'If you are using an (ansi r)outdated awk version(ansi reset), please upgrade to the latest version or use gawk latest instead.'
 
+  # `do { } catch { }`, not `try { } catch { }` — piping a large string into an
+  # external command through `try` deadlocks in Nushell 0.115.1 (confirmed via
+  # bisection: identical code with `do` instead of `try` completes instantly).
+  # `try` never returns for a real PR-sized diff, which is why this stayed
+  # invisible: the diff review always exits early on tiny fixtures in tests,
+  # and locally the awk step alone (outside any `try`) is also fast.
   if ($include | is-not-empty) {
     let patterns = $include | split row ','
-    $filtered_content = $filtered_content | try {
+    $filtered_content = $filtered_content | do {
       ^$awk_bin (generate-include-regex $patterns)
     } catch {
       print $outdated_awk
@@ -166,7 +172,7 @@ def apply-file-filters [
 
   if ($exclude | is-not-empty) {
     let patterns = $exclude | split row ','
-    $filtered_content = $filtered_content | try {
+    $filtered_content = $filtered_content | do {
       ^$awk_bin (generate-exclude-regex $patterns)
     } catch {
       print $outdated_awk

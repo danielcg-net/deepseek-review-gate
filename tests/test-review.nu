@@ -203,6 +203,29 @@ def 'get-diff：--patch-file takes priority over --patch-cmd' [] {
 
 # Both rejections run in a subprocess because they end in `exit`, which would
 # otherwise take the whole test run with them.
+# Regression: piping a large diff through `apply-file-filters`'s external awk
+# command from *inside* `try { } catch { }` deadlocks Nushell 0.115.1 — it
+# never returns for content past roughly the OS pipe buffer size (~64KB on
+# Linux), while the exact same pipe outside `try`, or through `do { } catch
+# { }` instead, completes instantly. The 8KB fixture patch never exceeded that
+# threshold, which is how this stayed invisible: repeat it well past 64KB here.
+@test
+def 'get-diff：a real-PR-sized diff through --exclude does not hang' [] {
+  let ctx = $in
+  let big_patch = 1..40 | each { $ctx.patch } | str join (char nl)
+  assert (($big_patch | get-uw) > 65536)
+  let patch_file = $nu.temp-dir | path join $'dsr-big-patch-(random chars -l 8).patch'
+  $big_patch | save --force $patch_file
+  let started = date now
+  let content = get-diff --patch-file $patch_file --exclude '*.md'
+  let elapsed = (date now) - $started
+  rm -f $patch_file
+  assert ($content | is-not-empty)
+  # Generous relative to nutest defaults, but nowhere near "hung" — the bug
+  # this guards against never returns at all.
+  assert ($elapsed < 10sec)
+}
+
 @test
 def 'get-diff：--patch-file rejects a missing path and a directory' [] {
   let run = {|path: string|
