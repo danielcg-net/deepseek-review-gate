@@ -33,6 +33,13 @@ inputs:
     required: false
     default: 'https://api.deepseek.com'
     description: 'The base url of DeepSeek API.'
+  request-timeout:
+    required: false
+    default: '15min'
+    description: >-
+      Max time to wait for a single DeepSeek API response before failing, e.g.
+      '15min' or '900sec'. Without this, an unresponsive provider hangs
+      silently until the CI job's own timeout kills it with no diagnostics.
   sys-prompt:
     required: false
     default: 'You are a professional code review assistant responsible for analyzing code changes in GitHub Pull Requests. Identify potential issues such as code style violations, logical errors, security vulnerabilities, and provide improvement suggestions. Clearly list the problems and recommendations in a concise manner.'
@@ -105,6 +112,7 @@ runs:
         GH_TOKEN_INPUT: ${{ inputs.github-token }}
         MAX_LENGTH_INPUT: ${{ inputs.max-length }}
         TEMPERATURE_INPUT: ${{ inputs.temperature }}
+        REQUEST_TIMEOUT_INPUT: ${{ inputs.request-timeout }}
         REPO_INPUT: ${{ github.repository }}
         ALLOWED_ASSOCIATIONS_INPUT: ${{ inputs.allowed-associations }}
         RECONCILE_THREADS_INPUT: ${{ inputs.reconcile-threads }}
@@ -169,6 +177,7 @@ runs:
               --sys-prompt $env.SYS_PROMPT_INPUT
               --user-prompt $env.USER_PROMPT_INPUT
               --temperature (try { $env.TEMPERATURE_INPUT | into float } catch { null })
+              --request-timeout (try { $env.REQUEST_TIMEOUT_INPUT | into duration } catch { 15min })
               --include $env.INCLUDE_PATTERNS_INPUT
               --exclude $env.EXCLUDE_PATTERNS_INPUT
               --comment $env.COMMENT_BODY_INPUT
