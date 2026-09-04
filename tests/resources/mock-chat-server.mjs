@@ -9,6 +9,10 @@
 //   broken  - an SSE stream with a truncated JSON chunk in the middle
 //   json    - a non streaming JSON completion, with reasoning_content
 //   errjson - an error object instead of a completion
+//   hang    - never responds; the request hangs until the client times out
+//             or the mock's own lifetime elapses
+//   hang-mid-stream - sends SSE headers plus one reasoning chunk, then stalls
+//             forever without closing the connection
 //
 // When a request-dump-path is given the raw request body is written there, so
 // tests can assert on the payload deepseek-review actually sends.
@@ -79,6 +83,17 @@ const server = createServer(async (req, res) => {
       })
     case 'errjson':
       return sendJson(res, 401, { error: { message: 'Authentication Fails', type: 'authentication_error' } })
+    case 'hang':
+      // Deliberately never write a response. The socket stays open until the
+      // client's own timeout fires or this process's LIFETIME_MS auto-exit.
+      return
+    case 'hang-mid-stream':
+      // Send real SSE headers plus one chunk, then stall without closing —
+      // covers a provider that starts streaming and then goes silent, as
+      // opposed to `hang`, which never responds at all.
+      res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' })
+      res.write(sse(delta({ reasoning_content: 'PARTIAL-BEFORE-STALL ' })))
+      return
     default:
       return sendJson(res, 500, { error: { message: `unknown mode ${mode}` } })
   }

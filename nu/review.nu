@@ -114,6 +114,10 @@ const DEFAULT_OPTIONS = {
   BASE_URL: 'https://api.deepseek.com',
   USER_PROMPT: 'Please review the following code changes:',
   SYS_PROMPT: 'You are a professional code review assistant responsible for analyzing code changes in GitHub Pull Requests. Identify potential issues such as code style violations, logical errors, security vulnerabilities, and provide improvement suggestions. Clearly list the problems and recommendations in a concise manner.',
+  # `http post` has no timeout of its own — an unresponsive or slow provider
+  # hangs until the CI job's own timeout kills it with zero diagnostics. This
+  # bounds the wait and turns that silent hang into a clear, timed failure.
+  REQUEST_TIMEOUT: 15min,
 }
 
 # Use DeepSeek AI to review code changes locally or in GitHub Actions
@@ -138,6 +142,7 @@ export def --env deepseek-review [
   --exclude(-x): string,    # Comma separated file patterns to exclude in the code review
   --temperature(-T): float, # Temperature for the model, between `0` and `2`, omitted and provider default is used when not set
   --comment: string,       # Additional comment text from a PR comment mention trigger
+  --request-timeout(-R): duration, # Max time to wait for a single DeepSeek API response before failing; default 15min
 ]: nothing -> nothing {
 
   $env.config.table.mode = 'psql'
@@ -155,6 +160,7 @@ export def --env deepseek-review [
   # temperature is only set when explicitly specified via flag / TEMPERATURE env / config.yml,
   # otherwise the payload omits the field and the provider's default applies
   let temperature = try { $temperature | default $env.TEMPERATURE? | into float } catch { null }
+  let request_timeout = $request_timeout | default $DEFAULT_OPTIONS.REQUEST_TIMEOUT
   # Determine output mode
   let output_mode = if $is_action { 'action' } else if ($output | is-not-empty) { 'file' } else { 'console' }
 
@@ -228,10 +234,23 @@ export def --env deepseek-review [
   }
   let payload = if $temperature == null { $payload } else { $payload | insert temperature $temperature }
   if $debug { print $'(char nl)Code Changes:'; hr-line; print $content }
-  print $'(char nl)Waiting for response from (ansi g)($url)(ansi reset) ...'
-  if $stream { streaming-output $url $payload --headers $CHAT_HEADER --debug=$debug; return }
+  print $'(char nl)Waiting for response from (ansi g)($url)(ansi reset), request-timeout: (ansi g)($request_timeout)(ansi reset) ...'
+  if $stream {
+    streaming-output $url $payload --headers $CHAT_HEADER --debug=$debug --request-timeout $request_timeout
+    return
+  }
 
-  let response = http post -e -H $CHAT_HEADER -t application/json $url $payload
+  let request_start = date now
+  let response = try {
+    http post -e -m $request_timeout -H $CHAT_HEADER -t application/json $url $payload
+  } catch {|err|
+    let elapsed = (date now) - $request_start
+    print $"(char nl)(ansi r)DeepSeek API request failed or timed out after (ansi reset)(ansi g)($elapsed)(ansi reset)(ansi r) \(request-timeout: ($request_timeout)\):(ansi reset)"
+    $err | table -e | print
+    exit $ECODE.SERVER_ERROR
+  }
+  let elapsed = (date now) - $request_start
+  print $'Received response after (ansi g)($elapsed)(ansi reset).'
   if ($response | is-empty) {
     print $'(ansi r)Oops, No response returned from ($url) ...(ansi reset)'
     exit $ECODE.SERVER_ERROR
@@ -330,6 +349,7 @@ def streaming-output [
   payload: record,    # The payload to send to DeepSeek API
   --debug,            # Debug mode
   --headers: list,    # The headers to send to DeepSeek API
+  --request-timeout: duration, # Max time to wait before the request is considered hung
 ] {
   print -n (char nl)
   kv set content 0
@@ -339,48 +359,60 @@ def streaming-output [
   # ("Exit doesn't catch internally"): the process ended up with a bare exit
   # code 1 plus an internal error dump instead of SERVER_ERROR. `for` iterates
   # the response stream just as lazily, so output still appears as it arrives.
-  for line in (
-    http post -e -H $headers -t application/json $url $payload
-      | tee {
-          let res = $in
-          let type = $res | describe
-          let record_error = $type =~ '^record'
-          let other_error  = $type =~ '^string' and $res !~ 'data: ' and $res !~ 'done'
-          if $record_error or $other_error {
-            $res | table -e | print
-            exit $ECODE.SERVER_ERROR
+  #
+  # The whole `for` — not just the initial `http post` call — is wrapped in
+  # `try`/`catch` below: `http post` is lazy, so a provider that sends headers
+  # or a few SSE chunks and then stalls only raises the `-m` timeout later,
+  # while `for` is still pulling from the stream. A `try` around just the
+  # `http post` call misses that case entirely.
+  try {
+    for line in (
+      http post -e -m $request_timeout -H $headers -t application/json $url $payload
+        | tee {
+            let res = $in
+            let type = $res | describe
+            let record_error = $type =~ '^record'
+            let other_error  = $type =~ '^string' and $res !~ 'data: ' and $res !~ 'done'
+            if $record_error or $other_error {
+              $res | table -e | print
+              exit $ECODE.SERVER_ERROR
+            }
           }
+        | lines
+    ) {
+      if ($line | is-empty) { continue }
+      # An SSE line starting with `:` is a comment — heartbeats such as
+      # `: keep-alive` or `: OPENROUTER PROCESSING`. They carry no payload and
+      # must be dropped before `parse-line`, which would otherwise abort the whole
+      # review with SERVER_ERROR. The `$IGNORED_MESSAGES` lookup below is an exact
+      # whole line match, so it never caught the ones whose text varies.
+      if ($line | str starts-with ':') { continue }
+      if ($IGNORED_MESSAGES | get -o $line | default false) { continue }
+      let last = $line | parse-line
+      if $debug { $last | to json | kv set last-reply }
+      let delta = $last | get -o choices.0.delta | default ($last | get -o message)
+      if ($delta | is-not-empty) {
+        let reason = $delta | coalesce-reasoning
+        let text = $delta.content? | default ''
+        # Print each banner once, when its counter first reaches 1. Testing the
+        # counter outside the increment re-printed the banner on every later
+        # chunk whenever the count stayed at exactly 1 — which is what happens
+        # when a provider sends its reasoning as a single chunk.
+        if ($reason | is-not-empty) {
+          kv set reasoning ((kv get reasoning) + 1)
+          if (kv get reasoning) == 1 { print $'(char nl)Reasoning Details:'; hr-line }
         }
-      | try { lines } catch { print $'(ansi r)Error Happened ...(ansi reset)'; exit $ECODE.SERVER_ERROR }
-  ) {
-    if ($line | is-empty) { continue }
-    # An SSE line starting with `:` is a comment — heartbeats such as
-    # `: keep-alive` or `: OPENROUTER PROCESSING`. They carry no payload and
-    # must be dropped before `parse-line`, which would otherwise abort the whole
-    # review with SERVER_ERROR. The `$IGNORED_MESSAGES` lookup below is an exact
-    # whole line match, so it never caught the ones whose text varies.
-    if ($line | str starts-with ':') { continue }
-    if ($IGNORED_MESSAGES | get -o $line | default false) { continue }
-    let last = $line | parse-line
-    if $debug { $last | to json | kv set last-reply }
-    let delta = $last | get -o choices.0.delta | default ($last | get -o message)
-    if ($delta | is-not-empty) {
-      let reason = $delta | coalesce-reasoning
-      let text = $delta.content? | default ''
-      # Print each banner once, when its counter first reaches 1. Testing the
-      # counter outside the increment re-printed the banner on every later
-      # chunk whenever the count stayed at exactly 1 — which is what happens
-      # when a provider sends its reasoning as a single chunk.
-      if ($reason | is-not-empty) {
-        kv set reasoning ((kv get reasoning) + 1)
-        if (kv get reasoning) == 1 { print $'(char nl)Reasoning Details:'; hr-line }
+        if ($text | is-not-empty) {
+          kv set content ((kv get content) + 1)
+          if (kv get content) == 1 { print $'(char nl)Review Details:'; hr-line }
+        }
+        print -n ($reason | default $text)
       }
-      if ($text | is-not-empty) {
-        kv set content ((kv get content) + 1)
-        if (kv get content) == 1 { print $'(char nl)Review Details:'; hr-line }
-      }
-      print -n ($reason | default $text)
     }
+  } catch {|err|
+    print $"(char nl)(ansi r)DeepSeek API request failed or timed out \(request-timeout: ($request_timeout)\):(ansi reset)"
+    $err | table -e | print
+    exit $ECODE.SERVER_ERROR
   }
 
   if $debug and (kv get last-reply | is-not-empty) {

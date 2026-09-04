@@ -1,6 +1,6 @@
 use std/assert
 use std/testing *
-use ../nu/common.nu [is-installed, windows?]
+use ../nu/common.nu [is-installed, windows?, ECODE]
 
 # End to end coverage for the two output paths of `deepseek-review`, driven by a
 # throwaway HTTP server. Nushell cannot serve HTTP, so the mock is a dependency
@@ -218,6 +218,31 @@ def 'streaming：an explicit temperature of 0 is still sent' [] {
 }
 
 @test
+def 'streaming：a provider that stalls mid-stream fails fast with a timeout message' [] {
+  let ctx = $in
+  if (skip-e2e? $ctx) { return }
+  # Regression for a real finding: a `try` around only the initial `http post`
+  # call misses a provider that sends headers and a chunk, then goes silent —
+  # `http post` is lazy, so that stall only raises the `-m` timeout later,
+  # while `for` is still pulling from the stream.
+  let mock = start-mock $ctx.dir hang-mid-stream
+  let started = date now
+  let result = run-review $mock.port '--request-timeout 500ms'
+  let elapsed = (date now) - $started
+  job kill $mock.job
+
+  assert equal $result.exit_code $ECODE.SERVER_ERROR
+  # Well under the mock's 20s auto-exit — proves the client's own timeout
+  # fired rather than the process merely outliving the mock.
+  assert ($elapsed < 10sec)
+  let out = $result.stdout | ansi strip
+  # The chunk sent before the stall must have reached the terminal — proves
+  # this is a genuine mid-stream stall, not just a connection-level failure.
+  assert ($out | str contains 'PARTIAL-BEFORE-STALL')
+  assert (($out | str contains 'timed out') or ($out | str contains 'timeout'))
+}
+
+@test
 def 'streaming：a PR comment is passed through in its own tags' [] {
   let ctx = $in
   if (skip-e2e? $ctx) { return }
@@ -231,6 +256,29 @@ def 'streaming：a PR comment is passed through in its own tags' [] {
   assert ($content | str contains '<comment>')
   assert ($content | str contains 'PLEASE FOCUS ON TESTS')
   assert ($content | str contains '</comment>')
+}
+
+@test
+def 'non-streaming：request-timeout fails fast with a clear message instead of hanging' [] {
+  let ctx = $in
+  if (skip-e2e? $ctx) { return }
+  # `--output` forces the same non-streaming `http post` path Action mode uses
+  # (both set `stream: false`), so this exercises the exact code that used to
+  # hang silently until the CI job's own timeout killed it with no diagnostics.
+  let mock = start-mock $ctx.dir hang
+  let out_file = $ctx.dir | path join 'timeout-result.md'
+  let started = date now
+  let result = run-review $mock.port $"--output '($out_file)' --request-timeout 500ms"
+  let elapsed = (date now) - $started
+  job kill $mock.job
+
+  assert equal $result.exit_code $ECODE.SERVER_ERROR
+  # Well under the mock's 20s auto-exit — proves the client timed the request
+  # out itself rather than merely outliving the mock.
+  assert ($elapsed < 10sec)
+  let out = $result.stdout | ansi strip
+  assert (($out | str contains 'timed out') or ($out | str contains 'timeout'))
+  assert equal ($out_file | path exists) false
 }
 
 @test
