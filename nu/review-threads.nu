@@ -29,8 +29,18 @@ def finding-fingerprint [finding: record] {
 
 # Parses the strict provider response. Invalid output is an error, never a
 # harmless empty review: a required machine gate must fail closed.
+def normalize-machine-review-json [review: string] {
+  let trimmed = $review | str trim
+  if (($trimmed =~ '(?is)^```json\s') and ($trimmed =~ '(?is)\s```$')) {
+    $trimmed | str replace -r '(?is)^```json\s*' '' | str replace -r '\s*```$' ''
+  } else {
+    $trimmed
+  }
+}
+
 export def parse-machine-findings [review: string] {
-  let parsed = try { $review | from json } catch { fail 'Machine review must be a JSON object with a findings array.' }
+  let normalized_review = normalize-machine-review-json $review
+  let parsed = try { $normalized_review | from json } catch { fail 'Machine review must be a JSON object with a findings array.' }
   let findings = $parsed.findings?
   if $findings == null { fail 'Machine review JSON is missing findings.' }
   let findings_type = $findings | describe

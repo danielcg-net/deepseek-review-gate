@@ -24,6 +24,14 @@ def 'machine findings：normalizes and fingerprints stable actionable findings' 
 }
 
 @test
+def 'machine findings：accepts a single fenced JSON response' [] {
+  let review = ['```json', ({ findings: [$FINDING] } | to json), '```'] | str join (char nl)
+  let result = parse-machine-findings $review
+  assert equal ($result | length) 1
+  assert equal ($result | first | get rule) 'machine-output-contract'
+}
+
+@test
 def 'machine findings：rejects malformed and duplicate findings fail closed' [] {
   let malformed = try { parse-machine-findings '{"findings":[{"severity":"warning"}]}' ; false } catch { true }
   assert equal $malformed true
