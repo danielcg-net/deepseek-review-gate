@@ -53,6 +53,12 @@ The action requires strict JSON findings. Each actionable finding receives a sta
 
 ## Partitioned reviews
 
+Thread reconciliation retrieves every review-thread page before creating or
+resolving threads. A failed request, malformed page, duplicate thread, or
+non-advancing cursor fails the invocation without reconciling a partial list.
+Ownership is determined only by the root comment's author and fingerprint;
+replies cannot confer ownership. This also applies to reconcile-only runs.
+
 For multiple partial reviewers, set `reconcile-threads: 'false'` on every partial invocation. Collect the complete JSON array of `finding-fingerprints` outputs, then run one final invocation:
 
 ```yaml

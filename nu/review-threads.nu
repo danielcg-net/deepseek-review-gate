@@ -124,12 +124,64 @@ def thread-fingerprint [thread: record, reviewer_login: string] {
   $fingerprint
 }
 
+# Materialize every page before callers can perform any reconciliation writes.
+# The injected fetcher keeps pagination/error handling testable without GitHub.
+export def collect-review-threads [fetch_page: closure] {
+  mut cursor: any = null
+  mut seen_cursors = []
+  mut threads = []
+  loop {
+    let page = do $fetch_page $cursor
+    let nodes = $page.nodes?
+    let nodes_type = $nodes | describe
+    if not (($nodes_type | str starts-with 'list') or ($nodes_type | str starts-with 'table')) {
+      fail 'GitHub review-thread page must contain a nodes array.'
+    }
+    if (($page.pageInfo.hasNextPage? | describe) != 'bool') {
+      fail 'GitHub review-thread page is missing valid pageInfo.'
+    }
+    for thread in $nodes {
+      if (($thread.id? | describe) != 'string') or ($thread.id | is-empty) or (($thread.isResolved? | describe) != 'bool') {
+        fail 'GitHub review-thread page contains an invalid thread.'
+      }
+      if $thread.id in ($threads | get id) { fail 'GitHub returned a duplicate review thread; retry reconciliation.' }
+      $threads = $threads | append $thread
+    }
+    if not $page.pageInfo.hasNextPage { break }
+    let next_cursor = $page.pageInfo.endCursor?
+    if (($next_cursor | describe) != 'string') or ($next_cursor | str trim | is-empty) {
+      fail 'GitHub review-thread pagination is missing an advancing cursor.'
+    }
+    if ($next_cursor in $seen_cursors) or ($nodes | is-empty) {
+      fail 'GitHub review-thread pagination did not advance.'
+    }
+    $seen_cursors = $seen_cursors | append $next_cursor
+    $cursor = $next_cursor
+  }
+  $threads
+}
+
+export def annotate-review-threads [threads: list<record>, reviewer_login: string] {
+  $threads | each {|thread| $thread | insert fingerprint (thread-fingerprint $thread $reviewer_login) }
+}
+
+export def plan-thread-reconciliation [threads: list<record>, active: list<string>, findings: list<record>] {
+  let owned_open = $threads | where { (not $in.isResolved) and ($in.fingerprint != null) }
+  let existing = $owned_open | get fingerprint
+  {
+    create: ($findings | where { $in.fingerprint not-in $existing })
+    resolve: ($owned_open | where { $in.fingerprint not-in $active } | get id)
+  }
+}
+
 def owned-review-threads [repo: string, pr_number: int, reviewer_login: string] {
   let parts = split-repo $repo
-  let query = 'query($owner: String!, $name: String!, $number: Int!) { repository(owner: $owner, name: $name) { pullRequest(number: $number) { reviewThreads(first: 100) { nodes { id isResolved comments(first: 100) { nodes { author { login } body } } } pageInfo { hasNextPage } } } } }'
-  let threads = graphql $query { owner: $parts.owner, name: $parts.name, number: $pr_number } | get repository.pullRequest.reviewThreads
-  if $threads.pageInfo.hasNextPage { fail 'More than 100 review threads require pagination; refusing incomplete reconciliation.' }
-  $threads.nodes | each {|thread| $thread | insert fingerprint (thread-fingerprint $thread $reviewer_login) }
+  # Only the root comment determines ownership; replies never confer ownership.
+  let query = 'query($owner: String!, $name: String!, $number: Int!, $after: String) { repository(owner: $owner, name: $name) { pullRequest(number: $number) { reviewThreads(first: 100, after: $after) { nodes { id isResolved comments(first: 1) { nodes { author { login } body } } } pageInfo { hasNextPage endCursor } } } } }'
+  let threads = collect-review-threads {|cursor|
+    graphql $query { owner: $parts.owner, name: $parts.name, number: $pr_number, after: $cursor } | get repository.pullRequest.reviewThreads
+  }
+  annotate-review-threads $threads $reviewer_login
 }
 
 def finding-body [finding: record] {
@@ -175,18 +227,16 @@ export def reconcile-machine-review-threads [
   --resolve-stale
 ] {
   let threads = owned-review-threads $repo $pr_number $reviewer_login
-  let existing_open = $threads | where { (not $in.isResolved) and ($in.fingerprint != null) } | get fingerprint
+  let plan = plan-thread-reconciliation $threads $active_fingerprints ($findings | default [])
   let head = try { http get -H (github-headers) $'https://api.github.com/repos/($repo)/pulls/($pr_number)' } catch {|err| fail $'Reading pull request head failed: ($err.msg? | default $err)' }
   let head_sha = $head.head.sha? | default ''
   if ($head_sha | is-empty) { fail 'GitHub pull request response has no head SHA.' }
-  for finding in ($findings | default []) {
-    if $finding.fingerprint not-in $existing_open { create-review-thread $repo $pr_number $head_sha $finding }
+  for finding in $plan.create {
+    create-review-thread $repo $pr_number $head_sha $finding
   }
   if $resolve_stale {
-    for thread in $threads {
-      if (not $thread.isResolved) and ($thread.fingerprint != null) and ($thread.fingerprint not-in $active_fingerprints) {
-        resolve-thread $thread.id
-      }
+    for thread_id in $plan.resolve {
+      resolve-thread $thread_id
     }
   }
 }
