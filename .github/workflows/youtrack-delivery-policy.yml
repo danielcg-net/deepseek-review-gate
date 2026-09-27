@@ -43,7 +43,9 @@ jobs:
               pull_number: pull.number,
               per_page: 100,
             });
-            const invalid = commits.filter(({ commit }) => !commit.message.startsWith(`${issueId}: `));
+            const invalid = commits.filter(({ commit, parents }) =>
+              (parents?.length ?? 0) < 2 && !commit.message.startsWith(`${issueId}: `)
+            );
             if (invalid.length > 0) {
               core.setFailed(`Every non-merge commit must begin ${issueId}: `);
             }
