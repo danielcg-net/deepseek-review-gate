@@ -144,6 +144,20 @@ def 'machine findings：accepts a single fenced JSON response' [] {
 }
 
 @test
+def 'machine findings：preserves actionable findings with missing or blank rules' [] {
+  let missing = $FINDING | reject rule
+  let blank = $FINDING | update rule '   '
+  for finding in [$missing, $blank] {
+    let parsed = parse-machine-findings ({ findings: [$finding] } | to json) | first
+    assert equal $parsed.rule 'unspecified-review-rule'
+    assert ($parsed.fingerprint =~ '^[a-f0-9]{64}$')
+  }
+  let missing_fingerprint = (parse-machine-findings ({ findings: [$missing] } | to json) | first).fingerprint
+  let blank_fingerprint = (parse-machine-findings ({ findings: [$blank] } | to json) | first).fingerprint
+  assert equal $missing_fingerprint $blank_fingerprint
+}
+
+@test
 def 'machine findings：rejects malformed and duplicate findings fail closed' [] {
   let malformed = try { parse-machine-findings '{"findings":[{"severity":"warning"}]}' ; false } catch { true }
   assert equal $malformed true

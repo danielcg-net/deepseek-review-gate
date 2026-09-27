@@ -27,9 +27,9 @@ jobs:
               core.info('Dependabot dependency update: delivery identifier validation is not required.');
               return;
             }
-            const match = pull.head.ref.match(/^(bizyeet-\d+)\/[a-z0-9][a-z0-9-]*$/);
+            const match = pull.head.ref.match(/^((?:bizyeet|sre)-\d+)\/[a-z0-9][a-z0-9-]*$/);
             if (!match) {
-              core.setFailed('Branch must be bizyeet-<id>/concise-description.');
+              core.setFailed('Branch must be bizyeet-<id>/concise-description or sre-<id>/concise-description.');
               return;
             }
             const issueId = match[1];
@@ -43,7 +43,9 @@ jobs:
               pull_number: pull.number,
               per_page: 100,
             });
-            const invalid = commits.filter(({ commit }) => !commit.message.startsWith(`${issueId}: `));
+            const invalid = commits.filter(({ commit, parents }) =>
+              (parents?.length ?? 0) < 2 && !commit.message.startsWith(`${issueId}: `)
+            );
             if (invalid.length > 0) {
               core.setFailed(`Every non-merge commit must begin ${issueId}: `);
             }
