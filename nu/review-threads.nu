@@ -3,6 +3,7 @@
 const MARKER_PREFIX = '<!-- deepseek-review-gate:fingerprint='
 const MARKER_SUFFIX = ' -->'
 const GRAPHQL_URL = 'https://api.github.com/graphql'
+const UNSPECIFIED_RULE = 'unspecified-review-rule'
 
 def github-headers [] {
   [
@@ -47,15 +48,16 @@ export def parse-machine-findings [review: string] {
   if not (($findings_type | str starts-with 'list') or ($findings_type | str starts-with 'table')) { fail 'Machine review findings must be an array.' }
 
   let normalized = $findings | each {|finding|
-    let severity = $finding.severity? | default '' | into string | str downcase
+    let severity = $finding.severity? | default '' | into string | str lowercase
     let path = $finding.path? | default '' | into string | str trim
     let line = try { $finding.line? | into int } catch { 0 }
-    let rule = $finding.rule? | default '' | into string | str trim
+    # A missing label must not discard an otherwise actionable finding.
+    let raw_rule = $finding.rule? | default '' | into string | str trim
+    let rule = if ($raw_rule | is-empty) { $UNSPECIFIED_RULE } else { $raw_rule }
     let message = $finding.message? | default '' | into string | str trim
     if $severity not-in ['critical', 'warning', 'suggestion'] { fail 'Machine finding severity must be critical, warning, or suggestion.' }
     if ($path | is-empty) { fail 'Machine finding path must not be empty.' }
     if $line < 1 { fail 'Machine finding line must be a positive changed-file line.' }
-    if ($rule | is-empty) { fail 'Machine finding rule must not be empty.' }
     if ($message | is-empty) { fail 'Machine finding message must not be empty.' }
     let base = { severity: $severity, path: $path, line: $line, rule: $rule, message: $message }
     $base | insert fingerprint (finding-fingerprint $base)

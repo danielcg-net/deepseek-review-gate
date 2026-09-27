@@ -214,7 +214,7 @@ export def --env deepseek-review [
     [
       $sys_prompt
       ''
-      'Return exactly one JSON object and nothing else: {"findings":[{"severity":"critical|warning|suggestion","path":"changed/file","line":positive_changed_line,"rule":"stable rule identifier","message":"actionable explanation"}]}. Return {"findings":[]} when there are no actionable findings. Never emit Markdown, prose outside JSON, or findings without an exact changed-file path and changed-file line.'
+      'Return exactly one JSON object and nothing else: {"findings":[{"severity":"critical|warning|suggestion","path":"changed/file","line":positive_changed_line,"rule":"non-empty stable rule identifier","message":"actionable explanation"}]}. Every finding must include a non-empty rule naming the defect class. Return {"findings":[]} when there are no actionable findings. Never emit Markdown, prose outside JSON, or findings without an exact changed-file path and changed-file line.'
     ] | str join "\n"
   } else { $sys_prompt }
   let user_prompt = $user_prompt | default $env.USER_PROMPT? | default $DEFAULT_OPTIONS.USER_PROMPT
