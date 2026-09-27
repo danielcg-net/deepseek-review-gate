@@ -27,9 +27,9 @@ jobs:
               core.info('Dependabot dependency update: delivery identifier validation is not required.');
               return;
             }
-            const match = pull.head.ref.match(/^(bizyeet-\d+)\/[a-z0-9][a-z0-9-]*$/);
+            const match = pull.head.ref.match(/^((?:bizyeet|sre)-\d+)\/[a-z0-9][a-z0-9-]*$/);
             if (!match) {
-              core.setFailed('Branch must be bizyeet-<id>/concise-description.');
+              core.setFailed('Branch must be bizyeet-<id>/concise-description or sre-<id>/concise-description.');
               return;
             }
             const issueId = match[1];

@@ -47,6 +47,9 @@ test('public workflows are least privilege and avoid privileged fork execution',
     assert.match(workflow, /run-tests --path \$\{\{ github\.workspace \}\}\/tests/, `${workflowName} must run only this repository's tests`);
   }
   assert.match(workflowText, /name: YouTrack delivery policy/);
+  const deliveryPolicy = await read('.github/workflows/youtrack-delivery-policy.yml');
+  assert.match(deliveryPolicy, /\^\(\(\?:bizyeet\|sre\)-\\d\+\)/);
+  assert.match(deliveryPolicy, /sre-<id>\/concise-description/);
 });
 
 test('consumer documentation prohibits privileged fork workflows and mutable action references', async () => {
