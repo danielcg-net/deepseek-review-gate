@@ -67,6 +67,11 @@ const server = createServer(async (req, res) => {
   for await (const chunk of req) chunks.push(chunk)
   if (dumpPath) writeFileSync(dumpPath, Buffer.concat(chunks))
 
+  // Every review path must send a single string-valued provider credential.
+  if (req.headers.authorization !== 'Bearer sk-mock-token') {
+    return sendJson(res, 401, { error: { message: 'Invalid mock authorization', type: 'authentication_error' } })
+  }
+
   switch (mode) {
     case 'sse':
       return streamSse(res, {})

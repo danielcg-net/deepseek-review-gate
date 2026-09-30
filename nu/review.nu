@@ -151,7 +151,7 @@ export def --env deepseek-review [
   let is_action = ($env.GITHUB_ACTIONS? == 'true')
   let token = $token | default $env.CHAT_TOKEN?
   let repo = $repo | default $env.DEFAULT_GITHUB_REPO?
-  let CHAT_HEADER = [Authorization $'Bearer ($token)']
+  let CHAT_HEADER = { Authorization: $'Bearer ($token)' }
   let stream = if $is_action or $write_file { false } else { true }
   let model = $model | default $env.CHAT_MODEL? | default $DEFAULT_OPTIONS.MODEL
   let base_url = $base_url | default $env.BASE_URL? | default $DEFAULT_OPTIONS.BASE_URL
@@ -348,7 +348,7 @@ def streaming-output [
   url: string,        # The Full DeepSeek API URL
   payload: record,    # The payload to send to DeepSeek API
   --debug,            # Debug mode
-  --headers: list,    # The headers to send to DeepSeek API
+  --headers: record,  # The headers to send to DeepSeek API
   --request-timeout: duration, # Max time to wait before the request is considered hung
 ] {
   print -n (char nl)
