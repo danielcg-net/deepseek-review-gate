@@ -27,6 +27,7 @@
 
 use std-rfc/kv *
 use diff.nu [get-diff]
+use provider-response.nu [request-provider-review]
 use review-threads.nu [parse-machine-findings, reconcile-machine-review-threads, serialize-active-fingerprints]
 use common.nu [
   ECODE, NO_TOKEN_TIP, hr-line, is-installed, windows?, mac?,
@@ -233,7 +234,8 @@ export def --env deepseek-review [
     thinking: { type: 'disabled' }
   }
   let payload = if $temperature == null { $payload } else { $payload | insert temperature $temperature }
-  if $debug { print $'(char nl)Code Changes:'; hr-line; print $content }
+  if $debug and not $is_action { print $'(char nl)Code Changes:'; hr-line; print $content }
+  if $debug and $is_action { print 'Action debug: request and response content are redacted.' }
   print $'(char nl)Waiting for response from (ansi g)($url)(ansi reset), request-timeout: (ansi g)($request_timeout)(ansi reset) ...'
   if $stream {
     streaming-output $url $payload --headers $CHAT_HEADER --debug=$debug --request-timeout $request_timeout
@@ -241,33 +243,25 @@ export def --env deepseek-review [
   }
 
   let request_start = date now
-  let response = try {
-    http post -e -m $request_timeout -H $CHAT_HEADER -t application/json $url $payload
-  } catch {|err|
-    let elapsed = (date now) - $request_start
-    print $"(char nl)(ansi r)DeepSeek API request failed or timed out after (ansi reset)(ansi g)($elapsed)(ansi reset)(ansi r) \(request-timeout: ($request_timeout)\):(ansi reset)"
-    $err | table -e | print
+  let outcome = request-provider-review $url $CHAT_HEADER $payload $request_timeout
+  if not $outcome.ok {
+    if $outcome.diagnostic.stage == 'transport' {
+      print 'DeepSeek API request failed or timed out; safe diagnostics:'
+    } else {
+      print 'DeepSeek review response rejected; safe diagnostics:'
+    }
+    $outcome.diagnostic | to json --raw | print
     exit $ECODE.SERVER_ERROR
   }
   let elapsed = (date now) - $request_start
-  print $'Received response after (ansi g)($elapsed)(ansi reset).'
-  if ($response | is-empty) {
-    print $'(ansi r)Oops, No response returned from ($url) ...(ansi reset)'
-    exit $ECODE.SERVER_ERROR
-  }
-  if $debug { print $'DeepSeek Model Response:'; hr-line; $response | table -e | print }
-  if ($response | describe) == 'string' {
-    print $'✖️ Code review failed！Error: '; hr-line; print $response
-    exit $ECODE.SERVER_ERROR
-  }
-  let message = $response | get -o choices.0.message
+  print $'Received valid review response after (ansi g)($elapsed)(ansi reset).'
+  let response = $outcome.response
+  if $debug and not $is_action { print $'(char nl)DeepSeek Model Response:'; hr-line; $response | table -e | print }
+  if $debug and $is_action { $outcome.diagnostic | to json --raw | print }
+  let message = $outcome.message
   let reason = $message | coalesce-reasoning
-  let review = $message.content? | default ($response | get -o message.content)
+  let review = $outcome.review
   let result = ['<details>' '<summary> Reasoning Details</summary>' $reason "</details>\n" $review] | str join "\n"
-  if ($review | is-empty) {
-    print $'✖️ Code review failed！No review result returned from ($base_url) ...'
-    exit $ECODE.SERVER_ERROR
-  }
   let result = if ($reason | is-empty) { $review } else { $result }
 
   match $output_mode {
@@ -289,7 +283,7 @@ export def --env deepseek-review [
     _ => { print $'Code Review Result:'; hr-line; print $result }
   }
 
-  if ($response.usage? | is-not-empty) {
+  if not $is_action and ($response.usage? | is-not-empty) {
     print $'(char nl)Token Usage:'; hr-line
     $response.usage? | table -e | print
   }

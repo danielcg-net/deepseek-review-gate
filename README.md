@@ -383,3 +383,7 @@ cr --pr-number 31 --exclude pnpm-lock.yaml
 Licensed under:
 
 - MIT license ([LICENSE](LICENSE) or http://opensource.org/licenses/MIT)
+
+## Provider response failures
+
+The non-streaming review path checks the HTTP status before accepting review content, rejects error/empty/malformed responses, and bounds response bodies to 8MiB. Failures remain nonzero and include only a fixed stage/envelope, HTTP status when available and an optional fingerprint of a validated request reference. Raw provider bodies, exception details and credentials are not failure diagnostics. In GitHub Actions, debug mode also redacts diffs, prompts and response content. Local console/file review output remains available. A missing review never counts as a clean review; the action does not automatically retry or change models.
