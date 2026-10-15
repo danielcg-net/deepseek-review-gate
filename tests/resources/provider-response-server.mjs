@@ -1,6 +1,6 @@
 // Local synthetic provider; persist only safe request booleans, never request data.
 import { createServer } from 'node:http';
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, renameSync } from 'node:fs';
 const [mode, observation] = process.argv.slice(2);
 const secret = 'PRIVATE_PROVIDER_BODY_SENTINEL';
 let count = 0;
@@ -9,7 +9,12 @@ const server = createServer(async (req, res) => {
   for await (const chunk of req) chunks.push(chunk);
   const p = JSON.parse(Buffer.concat(chunks));
   const observed = { count: ++count, auth: req.headers.authorization === 'Bearer sk-mock-token', model: p.model === 'deepseek-v4-pro', stream: p.stream === false, temperature: p.temperature === 0, thinking: p.thinking?.type === 'disabled', responseBytesWritten: 0, advertisedResponseBytes: null, responseClosed: false };
-  const persist = () => writeFileSync(observation, JSON.stringify(observed));
+  const persist = () => {
+    // Readers must never observe the truncation window of a close-time update.
+    const temporary = `${observation}.tmp`;
+    writeFileSync(temporary, JSON.stringify(observed));
+    renameSync(temporary, observation);
+  };
   persist();
   res.once('close', () => { observed.responseClosed = true; persist(); });
   if (mode === 'hang') return;
