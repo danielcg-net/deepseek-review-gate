@@ -5,6 +5,17 @@ import test from 'node:test';
 const root = new URL('../..', import.meta.url);
 
 const read = (path) => readFile(new URL(path, root), 'utf8');
+const immutableSetupNu = /^[ \t]*uses: hustcer\/setup-nu@[0-9a-f]{40}(?:[ \t]+#[^\r\n]*)?[ \t]*\r?$/m;
+
+test('setup action pin policy accepts release updates and rejects mutable or malformed references', () => {
+  const sha = '95cd3bfe252450ef7d35dd9a7ddecf3484341134';
+  for (const suffix of ['', ' # v3.27', ' # v3.28', ' # v4.0.0']) {
+    assert.match(`    uses: hustcer/setup-nu@${sha}${suffix}\n`, immutableSetupNu);
+  }
+  for (const ref of ['v3.28', 'main', sha.slice(0, 7), sha.slice(0, 39), `${sha}a`, `${sha}suffix`, `${sha.slice(0, 39)}g`]) {
+    assert.doesNotMatch(`    uses: hustcer/setup-nu@${ref} # v3.28\n`, immutableSetupNu);
+  }
+});
 
 test('public repository governance and security documents are present', async () => {
   const required = ['LICENSE', 'NOTICE', 'SECURITY.md', 'CONTRIBUTING.md', 'CODE_OF_CONDUCT.md', 'GOVERNANCE.md', 'SUPPORT.md'];
@@ -16,7 +27,7 @@ test('public repository governance and security documents are present', async ()
 
 test('action uses an immutable setup action SHA', async () => {
   const action = await read('action.yaml');
-  assert.match(action, /uses: hustcer\/setup-nu@[0-9a-f]{40} # v3\.27/);
+  assert.match(action, immutableSetupNu);
   assert.doesNotMatch(action, /chat-token.*print/i);
   assert.match(action, /finding-fingerprints:/);
   assert.match(action, /reconcile-only:/);
