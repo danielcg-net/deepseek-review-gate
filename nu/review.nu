@@ -234,6 +234,7 @@ export def --env deepseek-review [
     thinking: { type: 'disabled' }
   }
   let payload = if $temperature == null { $payload } else { $payload | insert temperature $temperature }
+  let payload = if $is_action { $payload | insert response_format { type: 'json_object' } } else { $payload }
   if $debug and not $is_action { print $'(char nl)Code Changes:'; hr-line; print $content }
   if $debug and $is_action { print 'Action debug: request and response content are redacted.' }
   print $'(char nl)Waiting for response from (ansi g)($url)(ansi reset), request-timeout: (ansi g)($request_timeout)(ansi reset) ...'
@@ -266,7 +267,15 @@ export def --env deepseek-review [
 
   match $output_mode {
     'action' => {
-      let findings = parse-machine-findings $review
+      # Never raise inside catch: Nu chains the original parser error, including
+      # private response excerpts. Discard it as data before emitting diagnostics.
+      let machine = try { { findings: (parse-machine-findings $review) } } catch { null }
+      if $machine == null {
+        print 'DeepSeek machine review rejected; safe diagnostics:'
+        $outcome.diagnostic | update stage 'machine_review' | to json --raw | print
+        exit $ECODE.SERVER_ERROR
+      }
+      let findings = $machine.findings
       let fingerprints = $findings | get fingerprint
       let reconcile = ($env.RECONCILE_THREADS_INPUT? | default 'true') == 'true'
       if $reconcile {

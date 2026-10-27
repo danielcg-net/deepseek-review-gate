@@ -41,7 +41,11 @@ def normalize-machine-review-json [review: string] {
 
 export def parse-machine-findings [review: string] {
   let normalized_review = normalize-machine-review-json $review
-  let parsed = try { $normalized_review | from json } catch { fail 'Machine review must be a JSON object with a findings array.' }
+  # A new error inside catch would retain Nu's raw JSON parser context.
+  let decoded = try { { value: ($normalized_review | from json --strict) } } catch { null }
+  if $decoded == null { fail 'Machine review must be a JSON object with a findings array.' }
+  let parsed = $decoded.value
+  if not (($parsed | describe) | str starts-with 'record') { fail 'Machine review must be a JSON object with a findings array.' }
   let findings = $parsed.findings?
   if $findings == null { fail 'Machine review JSON is missing findings.' }
   let findings_type = $findings | describe

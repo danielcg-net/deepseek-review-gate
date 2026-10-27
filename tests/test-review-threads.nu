@@ -144,6 +144,17 @@ def 'machine findings：accepts a single fenced JSON response' [] {
 }
 
 @test
+def 'machine findings：requires strict JSON objects and preserves empty or multiple findings' [] {
+  assert equal (parse-machine-findings '{"findings":[]}') []
+  let second = $FINDING | update line 255 | update message 'A second independent actionable finding.'
+  assert equal (parse-machine-findings ({findings: [$FINDING, $second]} | to json) | length) 2
+  for invalid in ['null', '[]', '{"findings":[],}', '{"findings":[] /* comment */}'] {
+    let failed = try { parse-machine-findings $invalid; false } catch { true }
+    assert equal $failed true
+  }
+}
+
+@test
 def 'machine findings：preserves actionable findings with missing or blank rules' [] {
   let missing = $FINDING | reject rule
   let blank = $FINDING | update rule '   '

@@ -9,6 +9,9 @@ const server = createServer(async (req, res) => {
   for await (const chunk of req) chunks.push(chunk);
   const p = JSON.parse(Buffer.concat(chunks));
   const observed = { count: ++count, auth: req.headers.authorization === 'Bearer sk-mock-token', model: p.model === 'deepseek-v4-pro', stream: p.stream === false, temperature: p.temperature === 0, thinking: p.thinking?.type === 'disabled', responseBytesWritten: 0, advertisedResponseBytes: null, responseClosed: false };
+  observed.jsonOutput = JSON.stringify(p.response_format) === JSON.stringify({ type: 'json_object' });
+  observed.responseFormatAbsent = !Object.hasOwn(p, 'response_format');
+  observed.jsonPrompt = p.messages?.some(message => /json/i.test(message.content) && message.content.includes('{"findings":[]}')) === true;
   const persist = () => {
     // Readers must never observe the truncation window of a close-time update.
     const temporary = `${observation}.tmp`;
@@ -32,6 +35,9 @@ const server = createServer(async (req, res) => {
   if (mode === 'malformed-reasoning') body.choices[0].message.reasoning_content = { private: secret };
   if (mode === 'fallback') body = { message: { content: '{"findings":[]}' } };
   if (mode === 'malformed-review') body = { choices: [{ message: { content: secret } }] };
+  if (mode === 'invalid-inner-json') body.choices[0].message.content = `{"findings":[{"message":"${secret} unescaped "quote""}]}`;
+  if (mode === 'invalid-machine-schema') body.choices[0].message.content = JSON.stringify({ findings: secret });
+  if (mode === 'invalid-finding-type') body.choices[0].message.content = JSON.stringify({ findings: [{ severity: 'warning', path: 'example.js', line: 1, message: { private: secret } }] });
   if (mode === 'unsafe-ref') headers['x-request-id'] = secret + ' unsafe value';
   if (mode === 'duplicate-ref') headers['x-request-id'] = ['first-ref', 'second-ref'];
   if (mode === 'dual-ref') headers['request-id'] = 'second-ref';

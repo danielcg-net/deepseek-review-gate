@@ -177,6 +177,7 @@ def 'streaming：sends stream true and the configured model and prompts' [] {
   assert equal $payload.model 'my-model'
   assert equal $payload.temperature 1.25
   assert equal $payload.thinking.type 'disabled'
+  assert equal ('response_format' in ($payload | columns)) false
   assert equal $payload.messages.0.role 'system'
   assert equal $payload.messages.0.content 'SYS-X'
   assert equal $payload.messages.1.role 'user'
