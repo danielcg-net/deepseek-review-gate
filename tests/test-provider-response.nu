@@ -29,6 +29,7 @@ def cli [dir: string, port: string, action: bool, debug: bool] {
   let debug_arg = if $debug { '--debug' } else { '' }
   ^$nu.current-exe -n -c $"
     $env.GITHUB_ACTIONS = '($action)'; $env.GITHUB_TOKEN = null; $env.GH_TOKEN = null
+    $env.GITHUB_OUTPUT = '($dir | path join "github-output")'
     use nu/review.nu [deepseek-review]
     deepseek-review sk-mock-token --patch-file '($patch)' --chat-url 'http://127.0.0.1:($port)/chat' --model deepseek-v4-pro --temperature 0 --request-timeout 500ms --sys-prompt '($INPUT_SECRET)' --user-prompt '($INPUT_SECRET)' --output '($output)' ($debug_arg)
   " | complete
@@ -40,6 +41,29 @@ def safe [result: record] {
 }
 def diagnostic [result: record] { safe $result | lines | where {|line| $line | str starts-with '{"stage":' } | last | from json }
 def wire [mock: record] { assert equal (open $mock.observation | select count auth model stream temperature thinking) {count: 1, auth: true, model: true, stream: true, temperature: true, thinking: true} }
+
+@test
+def 'Machine action requests JSON output and rejects malformed content without parser context' [] {
+  let ctx = $in
+  for mode in ['invalid-inner-json', 'invalid-machine-schema', 'invalid-finding-type'] {
+    for debug in [false, true] {
+      let m = start $ctx.dir $mode; let r = cli $ctx.dir $m.port true $debug; job kill $m.job
+      assert equal $r.exit_code 3
+      let text = safe $r
+      assert equal ($text | str contains $INPUT_SECRET) false
+      assert equal ($text | str contains 'nu::') false
+      assert equal $r.stderr ''
+      assert equal (diagnostic $r) {stage: machine_review, http_status: 200, request_ref: ('safe_Ref-123' | hash sha256), envelope: chat_completion}
+      assert equal (($ctx.dir | path join 'review.md') | path exists) false
+      assert equal (($ctx.dir | path join 'github-output') | path exists) false
+      let observed = open $m.observation
+      assert equal $observed.jsonOutput true
+      assert equal $observed.responseFormatAbsent false
+      assert equal $observed.jsonPrompt true
+      wire $m
+    }
+  }
+}
 
 @test
 def 'HTTP errors and provider error envelopes reject before review parsing' [] {
@@ -121,6 +145,7 @@ def 'Valid completion fallback and keepalive preserve file output and wire paylo
     let content = open -r ($ctx.dir | path join 'review.md')
     assert ($content | str contains '{"findings":[]}')
     if $mode != 'fallback' { assert ($content | str contains 'SYNTHETIC_REASONING') }
+    assert equal (open $m.observation).responseFormatAbsent true
     wire $m
   }
 }
