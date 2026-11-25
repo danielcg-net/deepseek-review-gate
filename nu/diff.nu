@@ -145,7 +145,7 @@ def get-patch-diff [
 }
 
 # Apply file filters to the diff content to include or exclude specific files
-def apply-file-filters [
+export def apply-file-filters [
   content: string,      # The diff content to filter
   --include: string,    # Comma separated file patterns to include in the code review
   --exclude: string,    # Comma separated file patterns to exclude in the code review
