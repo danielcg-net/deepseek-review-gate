@@ -83,11 +83,22 @@ inputs:
     required: false
     default: 'github-actions[bot]'
     description: "GitHub login allowed to own and resolve this action's review threads."
+  expected-head-sha:
+    required: false
+    default: ''
+    description: 'Opt into immutable same-repository PR review with this full head SHA and expected-base-sha. Uses a temporary bare Git object store, never a PR checkout.'
+  expected-base-sha:
+    required: false
+    default: ''
+    description: 'Full base SHA required together with expected-head-sha. Changed live refs fail closed; max-length must be zero.'
 
 outputs:
   finding-fingerprints:
     description: 'JSON array of stable fingerprints emitted by this review run.'
     value: ${{ steps.machine-review.outputs.finding-fingerprints }}
+  review-evidence:
+    description: 'Version 1 single-line JSON immutable source/projection hashes and refs, emitted only after a complete selected review or verified empty selection and guarded reconciliation. Unset in legacy mode or on failure.'
+    value: ${{ steps.machine-review.outputs.review-evidence }}
 
 runs:
   using: 'composite'
@@ -119,8 +130,17 @@ runs:
         RECONCILE_ONLY_INPUT: ${{ inputs.reconcile-only }}
         ACTIVE_FINGERPRINTS_INPUT: ${{ inputs.active-fingerprints }}
         REVIEWER_LOGIN_INPUT: ${{ inputs.reviewer-login }}
+        EXPECTED_HEAD_SHA_INPUT: ${{ inputs.expected-head-sha }}
+        EXPECTED_BASE_SHA_INPUT: ${{ inputs.expected-base-sha }}
       run: |
         let event = (open $env.GITHUB_EVENT_PATH)
+        let immutable = ($env.EXPECTED_HEAD_SHA_INPUT | is-not-empty) or ($env.EXPECTED_BASE_SHA_INPUT | is-not-empty)
+        if $immutable and $env.GITHUB_EVENT_NAME != 'pull_request' {
+          error make { msg: 'Immutable review requires a pull_request event.' }
+        }
+        if $env.RECONCILE_ONLY_INPUT == 'true' and $immutable {
+          error make { msg: 'Immutable review cannot use reconcile-only mode.' }
+        }
         let pr = $event.pull_request?.number? | default $event.issue?.number? | default '' | into string
         let watchMention = $env.WATCH_MENTION
         let commentBody = $event.comment?.body? | default ''
@@ -180,6 +200,8 @@ runs:
               --request-timeout (try { $env.REQUEST_TIMEOUT_INPUT | into duration } catch { 15min })
               --include $env.INCLUDE_PATTERNS_INPUT
               --exclude $env.EXCLUDE_PATTERNS_INPUT
+              --expected-head-sha $env.EXPECTED_HEAD_SHA_INPUT
+              --expected-base-sha $env.EXPECTED_BASE_SHA_INPUT
               --comment $env.COMMENT_BODY_INPUT
           )
         '

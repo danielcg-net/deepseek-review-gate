@@ -51,6 +51,52 @@ jobs:
 
 The action requires strict JSON findings. Each actionable finding receives a stable SHA-256 fingerprint and an inline GitHub review thread. On a later clean complete run, it resolves only a stale thread authored by `github-actions[bot]` with this action's marker. It never resolves a human thread or another bot's thread.
 
+## Immutable review evidence (opt-in)
+
+After pinning a commit containing this interface, pass both `expected-head-sha`
+and `expected-base-sha` as full lowercase commit SHAs from the triggering PR
+event, and use `max-length: 0`. Existing callers that omit both inputs retain
+their current behavior. Immutable mode supports open, unlocked, same-repository
+PRs only and requires Git on the runner. It reads immutable objects into a fresh
+temporary **bare** repository, computes the merge-base-to-head diff without
+external diff/textconv helpers, with an explicit 50% rename threshold, and removes that object store.
+It never checks out or executes contributor files. Immutable diff generation
+ignores title/body/commit-message skip directives: opt-in means perform the
+selected review. Missing refs, unavailable objects, changed live identity,
+provider failures, and size-limit settings fail the action without evidence.
+`reconcile-only` is incompatible with these inputs.
+
+The live PR repository, number, head and base are checked before fetching,
+after fetching, before every thread creation/resolution and after the final
+write. A detected change stops subsequent mutations and prevents evidence;
+GitHub provides no atomic head/base precondition for resolving threads, so an
+unobservable race during an individual API write cannot be eliminated. New
+comments are attached to the expected immutable head, never a replacement head.
+
+The optional `review-evidence` output is a single JSON line:
+
+```json
+{"repository":"owner/repo","pr":42,"head":"<40 hex>","base":"<40 hex>","mergeBase":"<40 hex>","version":1,"sourceDiffSha256":"<64 hex>","diffSha256":"<64 hex>","includePatterns":"","excludePatterns":"pnpm-lock.yaml,package-lock.json,*.lock","outcome":"reviewed","complete":true}
+```
+
+`sourceDiffSha256` hashes the complete immutable Git diff. `diffSha256` hashes
+the exact selected diff passed to the provider. The include/exclude policy
+remains unchanged; `complete` means the **entire selected projection** was
+processed without a length cutoff. An empty projection emits
+`outcome: "empty-selection"` after guarded reconciliation without a provider
+request; a nonempty valid provider response emits `outcome: "reviewed"`,
+including a clean response with no findings. Evidence contains no source text
+or credentials. It is unset for legacy callers, reconcile-only runs, rejected
+invocations and failures. Treat outputs from a failed step as unusable.
+
+This output is data, not a merge authorization or cryptographic attestation.
+Consumers must independently authenticate the producing workflow source,
+successful exact run/attempt and selected review policy, compare immutable
+candidate changes, and preserve required checks and unresolved-thread gates.
+Do not infer review coverage from a PR label, a prior check name, or a hash
+without its authenticated production context. This action uploads no artifacts
+and grants no queue exception.
+
 ## Partitioned reviews
 
 Thread reconciliation retrieves every review-thread page before creating or

@@ -26,7 +26,8 @@
 #  - Local PR Review: just cr -r hustcer/deepseek-review -n 32
 
 use std-rfc/kv *
-use diff.nu [get-diff]
+use diff.nu [get-diff, apply-file-filters]
+use review-proof.nu [expected-review-binding, fetch-immutable-review-source, read-review-binding, immutable-review-evidence]
 use provider-response.nu [request-provider-review]
 use review-threads.nu [parse-machine-findings, reconcile-machine-review-threads, serialize-active-fingerprints]
 use common.nu [
@@ -144,6 +145,8 @@ export def --env deepseek-review [
   --temperature(-T): float, # Temperature for the model, between `0` and `2`, omitted and provider default is used when not set
   --comment: string,       # Additional comment text from a PR comment mention trigger
   --request-timeout(-R): duration, # Max time to wait for a single DeepSeek API response before failing; default 15min
+  --expected-head-sha: string = '', # Opt-in immutable action review; both refs required
+  --expected-base-sha: string = '',
 ]: nothing -> nothing {
 
   $env.config.table.mode = 'psql'
@@ -182,8 +185,15 @@ export def --env deepseek-review [
     temperature: $temperature,
   }
   $env.GH_TOKEN = $gh_token | default $env.GITHUB_TOKEN?
+  let binding = expected-review-binding ($repo | default '') ($pr_number | default '') $expected_head_sha $expected_base_sha
+  if $binding != null and (not $is_action or $max_length != 0) {
+    error make { msg: 'Immutable review requires action mode and max-length: 0.' }
+  }
+  if $binding != null and ($token | is-empty) {
+    error make { msg: 'Immutable review requires a provider token.' }
+  }
 
-  if $is_action and ($pr_number | is-not-empty) and ($repo | is-not-empty) and (is-pr-locked $repo $pr_number) {
+  if $binding == null and $is_action and ($pr_number | is-not-empty) and ($repo | is-not-empty) and (is-pr-locked $repo $pr_number) {
     print $'(ansi y)PR #($pr_number) is locked, skipping review.(ansi reset)'
     exit $ECODE.SUCCESS
   }
@@ -200,10 +210,20 @@ export def --env deepseek-review [
     $setting | compact-record | reject -o repo | print; print -n (char nl)
   }
 
-  let content = (
+  let immutable_source = if $binding == null { null } else { fetch-immutable-review-source $binding }
+  let content = if $immutable_source != null {
+    apply-file-filters $immutable_source.content --include ($include | default '') --exclude ($exclude | default '')
+  } else { (
     get-diff --pr-number $pr_number --repo $repo --diff-to $diff_to
              --diff-from $diff_from --include $include --exclude $exclude --patch-cmd $patch_cmd
-             --patch-file $patch_file)
+             --patch-file $patch_file) }
+  if $immutable_source != null and ($content | is-empty) {
+    let reconcile = ($env.RECONCILE_THREADS_INPUT? | default 'true') == 'true'
+    reconcile-machine-review-threads $repo ($pr_number | into int) [] [] --resolve-stale=$reconcile --expected-binding $binding
+    let evidence = immutable-review-evidence $immutable_source.binding $immutable_source.content $content ($include | default '') ($exclude | default '') 'empty-selection'
+    $'finding-fingerprints=[](char nl)review-evidence=($evidence | to json --raw)(char nl)' | save --append $env.GITHUB_OUTPUT
+    return
+  }
   let length = $content | str stats | get unicode-width
   if ($max_length != 0) and ($length > $max_length) {
     print $'(char nl)(ansi r)The content length ($length) exceeds the maximum limit ($max_length), review skipped.(ansi reset)'
@@ -279,12 +299,17 @@ export def --env deepseek-review [
       let fingerprints = $findings | get fingerprint
       let reconcile = ($env.RECONCILE_THREADS_INPUT? | default 'true') == 'true'
       if $reconcile {
-        reconcile-machine-review-threads $repo ($pr_number | into int) $fingerprints $findings --resolve-stale
+        reconcile-machine-review-threads $repo ($pr_number | into int) $fingerprints $findings --resolve-stale --expected-binding $binding
       } else {
-        reconcile-machine-review-threads $repo ($pr_number | into int) $fingerprints $findings
+        reconcile-machine-review-threads $repo ($pr_number | into int) $fingerprints $findings --expected-binding $binding
       }
       if ($env.GITHUB_OUTPUT? | is-not-empty) {
         $'finding-fingerprints=(serialize-active-fingerprints $fingerprints)' | save --append $env.GITHUB_OUTPUT
+        if $immutable_source != null {
+          read-review-binding $binding | ignore
+          let evidence = immutable-review-evidence $immutable_source.binding $immutable_source.content $content ($include | default '') ($exclude | default '') 'reviewed'
+          $'(char nl)review-evidence=($evidence | to json --raw)(char nl)' | save --append $env.GITHUB_OUTPUT
+        }
       }
       print $'✅ Code review finished！PR (ansi g)#($pr_number)(ansi reset) findings were reconciled as machine review threads.'
     }

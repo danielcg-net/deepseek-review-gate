@@ -5,6 +5,8 @@ const MARKER_SUFFIX = ' -->'
 const GRAPHQL_URL = 'https://api.github.com/graphql'
 const UNSPECIFIED_RULE = 'unspecified-review-rule'
 
+use review-proof.nu [read-review-binding, apply-guarded-thread-plan]
+
 def github-headers [] {
   [
     Authorization $'Bearer ($env.GH_TOKEN)'
@@ -231,18 +233,14 @@ export def reconcile-machine-review-threads [
   findings?: list<record>,
   --reviewer-login: string = 'github-actions[bot]'
   --resolve-stale
+  --expected-binding: any
 ] {
   let threads = owned-review-threads $repo $pr_number $reviewer_login
   let plan = plan-thread-reconciliation $threads $active_fingerprints ($findings | default [])
   let head = try { http get -H (github-headers) $'https://api.github.com/repos/($repo)/pulls/($pr_number)' } catch {|err| fail $'Reading pull request head failed: ($err.msg? | default $err)' }
   let head_sha = $head.head.sha? | default ''
   if ($head_sha | is-empty) { fail 'GitHub pull request response has no head SHA.' }
-  for finding in $plan.create {
-    create-review-thread $repo $pr_number $head_sha $finding
-  }
-  if $resolve_stale {
-    for thread_id in $plan.resolve {
-      resolve-thread $thread_id
-    }
-  }
+  let guard = {|| if $expected_binding != null { read-review-binding $expected_binding | ignore } }
+  let expected_head = if $expected_binding == null { $head_sha } else { $expected_binding.head }
+  apply-guarded-thread-plan $plan $guard {|finding| create-review-thread $repo $pr_number $expected_head $finding } {|id| resolve-thread $id } --resolve-stale=$resolve_stale
 }
