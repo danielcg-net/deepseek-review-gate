@@ -135,6 +135,31 @@ def 'projection：default lockfile exclusion remains deterministic including emp
 }
 
 @test
+def 'immutable diff：an unchanged rename does not invent newly added source lines' [] {
+  let directory = mktemp -d
+  ^git init -q $directory
+  ^git -C $directory config user.name Test
+  ^git -C $directory config user.email test@example.invalid
+  "unchanged source\nsecond unchanged line\n" | save ($directory | path join original.txt)
+  ^git -C $directory add .
+  ^git -C $directory -c commit.gpgsign=false commit -qm original
+  let base = ^git -C $directory rev-parse HEAD | str trim
+  mv ($directory | path join original.txt) ($directory | path join renamed.txt)
+  ^git -C $directory add .
+  ^git -C $directory -c commit.gpgsign=false commit -qm renamed
+  let head = ^git -C $directory rev-parse HEAD | str trim
+  let bare = mktemp -d
+  ^git clone -q --bare --no-hardlinks $directory $bare
+  let content = immutable-git-diff $bare $base $head
+  assert ($content | str contains 'similarity index 100%')
+  assert ($content | str contains 'rename from original.txt')
+  assert ($content | str contains 'rename to renamed.txt')
+  assert not ($content | str contains '@@')
+  assert not ($content | str contains '+unchanged source')
+  rm -rf $bare $directory
+}
+
+@test
 def 'immutable invocation：partial refs length limits and missing tokens fail without evidence' [] {
   let output = mktemp
   let head = binding | get head

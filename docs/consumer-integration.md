@@ -59,7 +59,7 @@ event, and use `max-length: 0`. Existing callers that omit both inputs retain
 their current behavior. Immutable mode supports open, unlocked, same-repository
 PRs only and requires Git on the runner. It reads immutable objects into a fresh
 temporary **bare** repository, computes the merge-base-to-head diff without
-external diff/textconv helpers or rename detection, and removes that object store.
+external diff/textconv helpers, with an explicit 50% rename threshold, and removes that object store.
 It never checks out or executes contributor files. Immutable diff generation
 ignores title/body/commit-message skip directives: opt-in means perform the
 selected review. Missing refs, unavailable objects, changed live identity,

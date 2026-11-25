@@ -43,8 +43,8 @@ export def immutable-git-diff [directory: string, merge_base: string, head: stri
   if not ($merge_base =~ '^[a-f0-9]{40}$') or not ($head =~ '^[a-f0-9]{40}$') {
     fail 'Immutable diff requires full commit SHAs.'
   }
-  # Disable executable diff/textconv helpers, rename heuristics and submodule traversal.
-  git-safe -- --git-dir $directory -c core.quotePath=true -c color.ui=false diff --no-ext-diff --no-textconv --no-renames --full-index --submodule=short --ignore-submodules=none --src-prefix=a/ --dst-prefix=b/ $merge_base $head --
+  # Disable executable diff/textconv helpers, custom rename thresholds and submodule traversal.
+  git-safe -- --git-dir $directory -c core.quotePath=true -c color.ui=false diff --no-ext-diff --no-textconv --find-renames=50% --full-index --submodule=short --ignore-submodules=none --src-prefix=a/ --dst-prefix=b/ $merge_base $head --
 }
 
 export def fetch-immutable-review-source [binding: record] {
